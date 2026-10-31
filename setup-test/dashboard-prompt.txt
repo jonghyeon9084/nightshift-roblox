@@ -1,0 +1,7 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발 의 AGENTS.md를 먼저 읽으세요. 실제 구현 작업입니다. [IMPLEMENT_UI] @NightShift-Dashboard 에게 아래 UI 구현을 위임하고 결과를 검토·필요 수정 후 마무리하세요.
+담당 파일은 tools/mission-control/index.html, app.js, style.css, model.js, model.test.cjs만. server.cjs/게이트웨이/다른 파일은 메인이 변경 중이므로 수정 금지. 현재 실제 로컬 지도와 모바일 공개 URL이 서비스 중입니다.
+사용자 요구: 그룹별로 따로 보여주는 현재 지도 외에 모든 그룹/오케스트레이터/워커를 한눈에 보는 전체 맵이 기본이어야 함. 명령 전달과 응답 수신 때 실제 방향으로 패킷이 이동하고 해당 메시지·시각·발신/수신을 누르면 확인. 그룹별 드릴다운과 기존 메시지/로그 검색·다운로드 유지. 모바일390px 가로넘침 없이 명확하게. 기존다크디자인 유지.
+데이터 /api/state의 agents와 chats 배열이 실제 근거. 전체 화면은 그룹별Moderator를 각각 구분하고 해당 그룹의 participant 세션별 노드를 보여주어 서로 다른Moderator를 하나의가짜실행처럼 합치지 않음. 공통 전체조정 헤더는 서비스 상태이지 가짜모델메시지가아님. 새노드는 실제참가자에따라 동적생성. 독립그룹들을 한 SVG 또는 연결된 하나의 캔버스 섹션에 모두 보이게 하되 각카드별 개별맵만 나열하는것으로끝내지말것.
+최초 로딩의 과거기록은 새 활동으로 애니메이션하지 말고 새message.id만 처리. moderator @정확이름 위임 -> 해당participant, participant응답 -> 해당Moderator. 이동패킷을 클릭/키보드선택해 메시지 상세 확인. 과거 재생은 명확한 별도모드. 연결끊김시 마지막기록 표시, 살아있는것처럼가짜반짝임금지. prefers-reduced-motion 대응.
+모델표시 API는 메인이 추가 중: agents[].configuredModel/configuredEffort, chats[].modelInfo={moderator:{model,effort,observedAt},participants:{"실제이름":{model,effort,observedAt}}}. actual이없으면 구성값/미확인을 구분. 메인오케스트레이터와워크노드에 모델짧은이름 표시. state.development는 {mode,status,stage,...} 상주실행기 상태이며 있으면보조상태표시.
+검증은 node --check와 model.test.cjs 등 의미있는 라우팅/새메시지필터 검사를 실행. 브라우저 UI 직접제어는 메인이 하므로 하지 말고 통과/미검증을 구분해 보고. 사용자는 이미 로컬 구현을 승인함. 외부게시/유료API/인증변경/Studio조작 금지. 문서만쓰지말고 실제코드수정. 완료응답 [DASHBOARD_READY] 포함.

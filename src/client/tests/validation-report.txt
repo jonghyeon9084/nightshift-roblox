@@ -1,0 +1,118 @@
+NightShift-UI implementation / 2026-10-31
+
+Owned files:
+- src/client/Main.client.luau
+- src/client/Modules/StateStore.luau
+- src/client/Modules/TrayView.luau
+- src/client/tests/StateStore.spec.luau
+- src/client/tests/TrayView.spec.luau
+- src/client/tests/Run-StaticChecks.ps1
+- src/client/tests/validation-report.txt
+- src/client/.validation/.gitignore (temporary tooling excluded from Git)
+
+Preflight: Maestro group-chat list showed NightShift-Build as the only working
+group, with World/Server/UI (3 participants). Five other groups and all ordinary
+desktop AI tabs were idle. No additional worker was created.
+
+Deployment: Main is the contract LocalScript; Modules/StateStore and Modules/TrayView
+are sibling ModuleScripts and both are required by Main. The tests and .validation folders are development-only and must not be deployed to
+StarterPlayerScripts. Config, remotes and world remain owned by other workers.
+
+Wire contract:
+- Action RemoteEvent: exactly ProtocolVersion, RequestId, Action, StoreId,
+  RoundId, SeatGeneration, Payload. JoinStore uses the target StoreId and false
+  RoundId. All other IDs/revisions/tokens originate in server state.
+- ActionResult RemoteEvent: ProtocolVersion/RequestId identify outstanding input;
+  Ok/Code/MoveCode drive feedback, and failure schedules a limited snapshot.
+- State RemoteEvent: ProtocolVersion/Kind/Sequence/ServerTime and replacement
+  Self/Stores/Store slices. False clears Store. StoreId and monotone Revision
+  checks reject stale/cross-store details. No teamID alias is invented.
+- GetSnapshot RemoteFunction: {ProtocolVersion}; response Ok/Code/RetryAfter/
+  Snapshot. Events subscribe first. One outstanding Invoke, >=2s spacing,
+  <=2 automatic attempts, manual retry, explicit failure at 10 seconds.
+  A hung Invoke keeps its in-flight lock until its response to avoid concurrent
+  calls; State events, movement and the existing HUD continue independently.
+
+Implemented flows:
+- Four-store summary and keyboard 1/2/3/4 selection / touch buttons; M navigation.
+- Roster and ready state; E prepare/cancel; P explicit solo practice.
+- Shelf names/glyphs, all order lines/statuses, carrying, counter put-down and
+  acceptance with E; R free return. Orders/carry remain visible during outage.
+- Per-role owners, indices, connection/share state, missing segments, private
+  ReadShapes and team SharedShapes. E claim/share; Q release; 1/2/3 input.
+- G contextual position signal with sender name and marker; 5-second expiry.
+- Recovery pause, E resume-ready, F survivor solo finish, 10-second solo request
+  and peer cancellation; waiting players see their restricted status.
+- Server-classified result/reason/history and E free retry to preparation.
+- H help; B free reposition; X leave; F5 state retry; Tab fold. All core controls
+  have touch buttons. Timers use server time and the Store slice sample time.
+- Optional preparation-only apron-color swatch and local BoxHandleAdornment;
+  explicit free/not-for-sale/no-ownership language; no purchase or asset API.
+- Marker binding is 5s + 2s delay + one retry; manual retry/reposition/Hub exit.
+  Unloaded markers remove labels/connections and report SetLoaded=false.
+  Successful binding reports true and requests snapshot. Role renewals are 2s.
+
+Executed checks:
+- Official luau-lang/luau Windows tools release 0.745, downloaded for validation
+  under src/client/.validation. Automatic approval review rejected recursive
+  cleanup and a narrower explicit-file cleanup as "blocked by policy", without
+  a more specific reason. These tools remain locally, excluded from Git by
+  .validation/.gitignore. They are not a game dependency or deployment source.
+- Run-StaticChecks.ps1 -LuauBin <official-Luau-bin-directory>: exit 0.
+- luau-compile --null: all five .luau files compile without syntax errors.
+- luau-analyze: pure StateStore and TrayView modules have no diagnostics.
+- 16 actual pure reducer assertions pass: initial snapshot, duplicate/old
+  sequence, gap repair signal, old revision, new round, self-only timer sample,
+  running/paused/expired/clock-adjusted timers, version mismatch, required
+  snapshot slices, store mismatch, false clearing, and first-delta recovery.
+- The runner inlines the actual reducer source into the test only for execution;
+  relative arguments avoid the CLI's Unicode absolute-path issue on Windows.
+- All 22 Config actions are referenced, exactly one centralized FireServer and
+  InvokeServer exist, only finite PlayerGui WaitForChild is used, UTF-8 and
+  trailing whitespace checks pass; no TODO/purchase/HTTP/asset-loading API.
+
+Tray follow-up / moderator-requested correction:
+- Changed Main.client.luau and Run-StaticChecks.ps1; added Modules/TrayView.luau
+  and tests/TrayView.spec.luau; updated this report. Shared/server/world unchanged.
+- Three client-only Attachments under the current Counter use the exact
+  Config.World.TrayOffsets local positions. Each has a BillboardGui/TextLabel
+  showing tray/LineId number, product name/glyph and status wording.
+- LineId indexes fixed slots 1..3 even when Lines is unsorted/sparse or a line
+  is Cancelled. Tray occupancy requires matching server TrayIndex; inconsistent
+  indices show a synchronization message instead of moving or renumbering items.
+- Empty, uncollected/carried (physically empty), Tray, Accepted and Cancelled
+  remain distinct without relying on color or sound. No new remote/wire field.
+- StoreId/RoundId/OrderId identity changes destroy old local tray instances and
+  recreate all three from the latest server state. A store/marker StoreId guard
+  prevents new-store contents appearing at the old counter before rebinding.
+- clearMarkers destroys all three GUI/anchor pairs on unload/character removal;
+  successful rebind calls syncTrays to restore the current order. Incoming Store
+  packets also synchronize immediately. Same-context packets update label text
+  without recreating the tray instances. Extra instances: 3 Attachments,
+  3 BillboardGuis and 3 TextLabels; no BasePart, Light or physics assembly.
+- 19 actual pure tray assertions pass: 3 empty slots/wording, accepted/cancelled
+  fixed slots, unsorted/sparse IDs, glyph/name/status wording, carried/uncollected
+  empty wording, inconsistent TrayIndex, identity changes for order/round/store,
+  current-state reconstruction, old-state clearing and wire-state immutability.
+- Total pure assertions: 35 (16 reducer + 19 tray). The runner additionally checks
+  configured-offset positioning, state refresh and unload cleanup wiring in
+  source. These wiring checks are static, not actual Instance lifecycle tests.
+- Actual Billboard placement, overlap/readability, rotated counters, Instance
+  cleanup during streaming, rebinding and live server integration remain
+  unverified; Studio/game execution was prohibited and was not performed.
+
+Not verified:
+- Main's full Roblox type/API check: standalone CLI lacks Roblox engine globals.
+- Studio deployment/require and play, actual server integration, multiplayer
+  ordering, real streaming, touch layout/glyph readability, R6/R15 apron fit,
+  actual GUI-object count, memory/frame/network budgets and 16-player load.
+- Pure reducer assertions are not Studio, gameplay, mobile or usability passes.
+- No Studio manipulation, game execution, publishing, selling, external assets,
+  paid generation, OpenAI API or external messages were performed.
+
+Official references checked:
+https://github.com/luau-lang/luau/releases/tag/0.745
+https://create.roblox.com/docs/reference/engine/classes/RemoteFunction
+https://create.roblox.com/docs/reference/engine/classes/GuiButton
+https://create.roblox.com/docs/reference/engine/classes/BoxHandleAdornment
+https://create.roblox.com/docs/reference/engine/classes/HandleAdornment

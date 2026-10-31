@@ -1,0 +1,21 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+(async () => {
+  const response = await fetch('http://127.0.0.1:43821/api/state');
+  assert.equal(response.status, 200);
+  const state = await response.json();
+  assert.equal(state.ok, true);
+  assert(Date.now() - Date.parse(state.at) < 30000, 'State is stale');
+  const chat = state.chats.find(c => c.topic === 'NightShift-Setup-Test');
+  assert(chat, 'Real Maestro group chat missing');
+  const delegation = chat.messages.find(m => m.participantName === 'moderator' && m.content.includes('LIVE-MAP-20261031') && m.content.includes('@NightShift-Worker'));
+  const reply = chat.messages.find(m => m.participantName === 'NightShift-Worker' && m.content.includes('LIVE-MAP-20261031') && m.content.includes('NIGHTSHIFT-A7C9'));
+  assert(delegation && reply, 'Expected actual moderator/worker messages');
+  assert(reply.timestamp > delegation.timestamp);
+  const post = await fetch('http://127.0.0.1:43821/api/state', {method:'POST'});
+  assert.equal(post.status,405,'Map must not accept mutations');
+  const result = {verifiedAt:new Date().toISOString(),liveMap:true,readOnly:true,chatId:chat.id,delegationId:delegation.id,replyId:reply.id,state:chat.state};
+  fs.writeFileSync(path.resolve(__dirname,'../.setup/live-map-verification.json'),JSON.stringify(result,null,2));
+  console.log(JSON.stringify(result));
+})().catch(e=>{console.error(e.message);process.exitCode=1;});

@@ -1,0 +1,7 @@
+[
+ {"tool":"execute_luau","arguments":{"datamodel_type":"Edit"},"codeFile":".setup/integration/install.luau","label":"idempotency second installation"},
+ {"tool":"start_stop_play","arguments":{"is_start":true},"label":"actual local play start"},
+ {"tool":"get_studio_state"},
+ {"tool":"execute_luau","arguments":{"datamodel_type":"Server","code":"local world=workspace:FindFirstChild('NightShiftWorld'); return game:GetService('HttpService'):JSONEncode({World=world~=nil,Parts=world and world:GetAttribute('BuildPartCount'),Players=#game:GetService('Players'):GetPlayers(),Baseplate=workspace:FindFirstChild('Baseplate')~=nil,Remotes=game:GetService('ReplicatedStorage').NightShift:FindFirstChild('Remotes')~=nil})"},"label":"runtime server baseline"},
+ {"tool":"get_console_output"}
+]

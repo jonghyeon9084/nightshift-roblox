@@ -1,0 +1,2 @@
+@NightShift-Review 독립 검토. AGENTS.md, commerce-expansion-brief, commerce-contract와 실제변경소스/각handoff/retention-plan을 읽는다. 코드수정X, docs/implementation/commerce-review.md만작성. 저장데이터유실/복제/개인돈·공동돈혼동, 동일마지막재고 동시주문, 도난권한·보호·정리, 물리상호작용, 8점포로드, 무료레벨해금, 유료편의의경쟁우위, 음성비지원우회경로를검토. 실제실행과정적검토구분. 수정필요문제만severity/file/재현/최소수정/검증으로간결히. 단순문구제안때문에구현순환금지. Moderator는결과파일존재확인후 [STAGE_READY:COMMERCE_REVIEW]; 통과표식은검토작업완료이며발견이슈는다음통합단계가고쳐야한다. Studio변경/구매/게시금지.
+

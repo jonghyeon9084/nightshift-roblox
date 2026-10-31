@@ -1,0 +1,4 @@
+[
+ {"tool":"execute_luau","arguments":{"datamodel_type":"Client"},"codeFile":"tools/integration/inspect-client.luau","label":"live HUD inspection"},
+ {"tool":"get_console_output"}
+]

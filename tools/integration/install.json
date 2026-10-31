@@ -1,0 +1,6 @@
+[
+ {"tool":"list_roblox_studios","label":"verify target"},
+ {"tool":"get_studio_state","label":"verify Edit"},
+ {"tool":"execute_luau","arguments":{"datamodel_type":"Edit"},"codeFile":".setup/integration/install.luau","label":"install owned namespace"},
+ {"tool":"get_console_output","label":"install console"}
+]

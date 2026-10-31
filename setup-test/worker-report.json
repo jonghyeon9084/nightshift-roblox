@@ -1,0 +1,7 @@
+{
+    "testId":  "nightshift-maestro-handshake-20261031-a7c9",
+    "nonce":  "NIGHTSHIFT-A7C9",
+    "success":  false,
+    "explanation":  "completedOrders(5) \u003e= requiredOrders(5)는 true이고 blackoutResolved도 true이지만 shiftFinished가 false이므로 AND 조건의 결과는 false입니다.",
+    "testedStudio":  false
+}

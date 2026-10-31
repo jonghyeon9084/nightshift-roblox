@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "maxWorkers": 4,
+  "stages": [
+    {
+      "id": "commerce_contract",
+      "name": "성장·유통 계약과 재방문 기획",
+      "chatName": "NightShift-CommerceContract",
+      "participants": [
+        "NightShift-Integrator",
+        "NightShift-Planner"
+      ],
+      "promptFile": "setup-test/commerce-contract-prompt.txt",
+      "completionMarker": "[STAGE_READY:COMMERCE_CONTRACT]",
+      "requiredFiles": [
+        "docs/implementation/commerce-contract.md",
+        "src/shared/CommerceConfig.luau",
+        "docs/design/retention-plan.md"
+      ],
+      "modelAssignments": {
+        "Integrator": "complex",
+        "Planner": "standard"
+      }
+    },
+    {
+      "id": "commerce_foundations",
+      "name": "저장·경제·배송·8매장 병렬 구현",
+      "chatName": "NightShift-CommerceFoundations",
+      "participants": [
+        "NightShift-Profiles",
+        "NightShift-Economy",
+        "NightShift-Delivery",
+        "NightShift-World"
+      ],
+      "promptFile": "setup-test/commerce-foundations-prompt.txt",
+      "completionMarker": "[STAGE_READY:COMMERCE_FOUNDATIONS]",
+      "requiredFiles": [
+        "src/server/Modules/ProfileService.luau",
+        "src/server/Modules/CommerceService.luau",
+        "src/server/Modules/ProgressionService.luau",
+        "src/server/Modules/DeliveryService.luau",
+        "tools/world/BuildWorld.luau",
+        ".setup/handoffs/profiles.json",
+        ".setup/handoffs/economy.json",
+        ".setup/handoffs/delivery.json",
+        ".setup/handoffs/world-commerce.json"
+      ],
+      "modelAssignments": {
+        "Profiles": "complex",
+        "Economy": "complex",
+        "Delivery": "standard",
+        "World": "standard"
+      }
+    },
+    {
+      "id": "commerce_app",
+      "name": "게임 연결·도매몰·성장 화면",
+      "chatName": "NightShift-CommerceApp",
+      "participants": [
+        "NightShift-Server",
+        "NightShift-UI"
+      ],
+      "promptFile": "setup-test/commerce-app-prompt.txt",
+      "completionMarker": "[STAGE_READY:COMMERCE_APP]",
+      "requiredFiles": [
+        "src/server/Main.server.luau",
+        "src/server/Modules/RankingService.luau",
+        "src/client/Main.client.luau",
+        ".setup/handoffs/server-commerce.json",
+        ".setup/handoffs/ui-commerce.json"
+      ],
+      "modelAssignments": {
+        "Server": "complex",
+        "UI": "standard"
+      }
+    },
+    {
+      "id": "commerce_review",
+      "name": "경제·저장·도난 독립 검토",
+      "chatName": "NightShift-CommerceReview",
+      "participants": [
+        "NightShift-Review"
+      ],
+      "promptFile": "setup-test/commerce-review-prompt.txt",
+      "completionMarker": "[STAGE_READY:COMMERCE_REVIEW]",
+      "requiredFiles": [
+        "docs/implementation/commerce-review.md"
+      ],
+      "modelAssignments": {
+        "Review": "complex"
+      }
+    },
+    {
+      "id": "commerce_integration",
+      "name": "확장 통합·Studio 플레이·음성 준비",
+      "chatName": "NightShift-CommerceIntegration",
+      "participants": [
+        "NightShift-Integrator"
+      ],
+      "promptFile": "setup-test/commerce-integration-prompt.txt",
+      "completionMarker": "[STAGE_READY:COMMERCE_INTEGRATION]",
+      "requiredFiles": [
+        "docs/implementation/commerce-integration-report.md",
+        ".setup/commerce-verification.json"
+      ],
+      "modelAssignments": {
+        "Integrator": "complex"
+      }
+    }
+  ]
+}
+

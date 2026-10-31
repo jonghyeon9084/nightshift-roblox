@@ -1,0 +1,7 @@
+프로젝트 루트의 AGENTS.md, docs/commerce-expansion-brief.md가 사용자 최신 요구다. 기존 docs/implementation/contract.md, integration-report.md 및 필요한 실제 소스만 읽고 기존 완주 버전을 확장한다.
+다음 두 독립 작업을 즉시 병렬 위임:
+@NightShift-Integrator: docs/implementation/commerce-contract.md와 src/shared/CommerceConfig.luau를 작성. 사용자 요구 전체의 구체적 모듈 API/Remote 필드/오류코드/서버권한/상품·공유재고·배송·도난 상태 전이/저장 스키마/설치 경로를 정한다. 기존 Config/contract 전체 재작성 금지. 계약은 가능한 200줄 안팎, 실제 공개 상수는 Config에 둔다. 8매장 두 줄, 기본8종+희귀3종, 직접진열/공유도매재고/트럭·진열도난/경보/레벨/저장/음성/유료편의 초안을 모두 다룬다.
+이후 파일 소유권을 계약에서 고정: Profiles=src/server/Modules/ProfileService.luau 및 그 spec; Economy=CommerceService.luau,ProgressionService.luau 및 spec; Delivery=DeliveryService.luau 및 spec; World=tools/world/; Server=기존 서버 Main/Protocol/GameService/WorldAdapter 통합과 RankingService; UI=src/client/. 같은 파일 수정 금지. 물류 모듈은 엔진 어댑터 주입을 포함하고 World가 생성할 사무실/진열 슬롯/하역/트럭 경로 마커를 정확히 지정. Profiles/Economy/Delivery/World가 서로의 미완성 소스 없이 계약으로 병렬 구현 가능해야 한다.
+@NightShift-Planner: docs/design/retention-plan.md를 작성. 위 최신 brief를 기준으로 첫5분·교대·재방문 흐름, 무료 레벨 도구 해금표, 제한 재고/희귀 납품/약탈의 공정한 회복, P0/P1/P2 백로그, 비강압 유료 편의·도구외형 후보를 구체화. 가설과 실제검증 구분. 구현 계약 필드 수정은 금지, 불일치는 moderator에게 알림.
+Moderator는 두 결과의 핵심 충돌만 확인하고 파일 생성/계약/안전한 저장/권한을 검토. 완료 보고는 변경 파일·검사·미검증·다음 담당 각 1~3줄. 별도 보고서 재작성 턴이나 사소한 문구 때문에 반복 검토하지 않는다. 완성 시 단독줄 [STAGE_READY:COMMERCE_CONTRACT]. Studio 조작/유료 API/게시/판매/계정 설정 변경 금지. 모델·추론은 역할에 맞춘 설정 사용. 뚜렷하게 독립적인 대형 하위 작업이 필요하면 담당 파일과 완료 조건을 정해 등록 요청하되 동시 총4 상한.
+

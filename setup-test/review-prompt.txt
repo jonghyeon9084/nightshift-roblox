@@ -1,0 +1,2 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. [REVIEW_1] @NightShift-Review 에게 AGENTS.md, docs/implementation/contract.md, docs/design/scale-plan.md, src/와 tools/world/ 실제 소스를 읽고 독립 검토하도록 위임하세요. 코드 변경과 Studio 조작은 금지. 보고문서 docs/implementation/code-review.md만 저장하는 예외를 허용합니다.
+점검: 팀간권한/상태격리, 2~4인 및 1인연습, 동시주문완료/지연원격/타이머, 이탈/재시작/정전교착, 모듈 경로와 API, 모바일버튼/무음단서, 맵통로/마커/기본시각, 유료에셋/실제결제미포함. 정확한파일·줄·재현조건·수정방향을이슈ID로기록하고 통과/미실행 구분. 검토가끝났다는뜻의 [STAGE_READY:REVIEW]로마무리하며 이표식은 코드가무조건통과라는의미아님. 다음통합단계가검토문서의문제를수정해야함. 파일읽지않은추측검토금지.

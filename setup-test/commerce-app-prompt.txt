@@ -1,0 +1,5 @@
+AGENTS.md와 commerce-contract,각 .setup/handoffs/*.json 및 실제새모듈을 읽는다. @NightShift-Server 와 @NightShift-UI 를 병렬 위임.
+Server: src/server/ 기존 Main/Protocol/GameService/WorldAdapter와 RankingService 및 통합spec만. 새Profile/Commerce/Delivery를 실제런타임연결, PlayerAdded/Removing/BindToClose, 공용재고/주문/진열/판매/도난/경보/XP·레벨·지갑·프리셋·기록의 서버권한과프로토콜. 점포소속과방문위치분리, 8점포설정. 순위는서버확정성과만, 인원·도구단계·연습/지원 구분, 공용 초기자금/중복거래로 영구돈 복제불가. 새모듈변경필요는모더레이터에파일별조율. 결과 .setup/handoffs/server-commerce.json.
+UI: src/client/만. 사무실PC의공용도매몰(실재잔량/희귀표시/재입고/가격/주문취소/배송상태), 상품직접집기·진열슬롯·판매, 개인지갑과점포자금분리, 도난경보·위치·회수힌트, XP/레벨·무료해금도구/프로필재접속/프리셋/순위. 키보드·터치. 상호작용은실제서버승인후표시. 8종+희귀상품라벨, 희귀재고알림은모든점포동일. Roblox기본음성사용안내와비음성핑. 계정음성가능여부실패는게임진행차단X. 유료도구외형/추가프리셋카탈로그는실제상품ID없는초안/미판매상태를명확히표시하며가짜구매성공/실제결제호출금지. 결과 .setup/handoffs/ui-commerce.json.
+별도보고서작성턴없이 handoff들을Moderator가읽어프로토콜일치·에러·실제코드만확인. 두완료후 [STAGE_READY:COMMERCE_APP]. Studio직접조작금지. 불필요한전체재테스트금지, 관련회귀+새동시성검사.
+

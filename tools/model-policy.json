@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "moderator": {"model":"gpt-6-astra","effort":"high","reason":"전체 설계 조정·통합·복합 오류 판단"},
+  "roles": {
+    "Planner":{"model":"gpt-6.1-sol","effort":"high","reason":"요구사항과 예외를 포함한 기획 수정"},
+    "DesignReview":{"model":"gpt-6-astra","effort":"high","reason":"독립 설계 검토·다인원 경계 사례"},
+    "Server":{"model":"gpt-6-astra","effort":"high","reason":"다인원 서버 권한·타이머·상태 격리"},
+    "UI":{"model":"gpt-6.1-sol","effort":"medium","reason":"확정 계약에 맞춘 Roblox UI 구현"},
+    "World":{"model":"gpt-6.1-sol","effort":"medium","reason":"확정 공간 계약의 직접 제작 맵"},
+    "Dashboard":{"model":"gpt-6.1-sol","effort":"medium","reason":"실제 이벤트 기반 전체 상황실 UI"},
+    "Story":{"model":"gpt-6.1-sol","effort":"medium","reason":"제약이 명확한 이야기·문구 작성"},
+    "Review":{"model":"gpt-6-astra","effort":"high","reason":"독립 코드 검토와 동시성 검증"},
+    "Test":{"model":"gpt-6.1-sol","effort":"high","reason":"테스트 실행·실패 분류"},
+    "Worker":{"model":"gpt-6-luna","effort":"low","reason":"작고 명확한 확인·정리 작업"},
+    "Main":{"model":"gpt-6-astra","effort":"high","reason":"기본 조정 역할"}
+  },
+  "tiers": {
+    "simple":{"model":"gpt-6-luna","effort":"low"},
+    "standard":{"model":"gpt-6.1-sol","effort":"medium"},
+    "complex":{"model":"gpt-6-astra","effort":"high"}
+  }
+}

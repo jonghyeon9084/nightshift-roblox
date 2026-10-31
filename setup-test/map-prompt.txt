@@ -1,0 +1,1 @@
+실제 지도 연결 확인을 위한 짧은 메시지 교환입니다. @NightShift-Worker 에게 기존 setup-test/worker-report.json을 읽기만 하게 하세요. 워커는 'LIVE-MAP-20261031: ' 다음에 nonce와 success를 짧게 답하세요. 파일 수정, 추가 에이전트 생성, Studio 조작, 추가 검증 실행은 하지 마세요. 메인은 워커 답변을 받고 '지도 연결 확인 응답 수신' 한 줄로 마치세요. ChatGPT 구독 인증을 유지하세요.

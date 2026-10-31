@@ -1,0 +1,5 @@
+[
+ {"tool":"list_roblox_studios","label":"current place selection"},
+ {"tool":"get_studio_state","label":"edit required before writes"},
+ {"tool":"execute_luau","arguments":{"datamodel_type":"Edit","code":"local out={Name=game.Name,PlaceId=game.PlaceId,Running=game:GetService('RunService'):IsRunning(),MaxPlayers=game:GetService('Players').MaxPlayers,Streaming=workspace.StreamingEnabled,Children={}} for _,v in ipairs(workspace:GetChildren()) do table.insert(out.Children,{Name=v.Name,Class=v.ClassName,Owned=v:GetAttribute('NightShiftOwned')}) end return game:GetService('HttpService'):JSONEncode(out)"},"label":"read only baseline"}
+]

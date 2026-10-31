@@ -1,0 +1,7 @@
+프로젝트 AGENTS.md와 docs/implementation/commerce-contract.md, src/shared/CommerceConfig.luau, docs/commerce-expansion-brief.md만 먼저 읽는다. 다음 네 담당을 같은 위임에서 병렬 시작한다. 동시 총4. 각자 담당 소스와 필요한 인접 인터페이스만 읽고 전체 문서 반복 복사 금지.
+@NightShift-Profiles: src/server/Modules/ProfileService.luau, src/server/tests/ProfileService.spec.luau. UserId 프로필 저장/복원, 스키마/마이그레이션, 개인지갑/XP/도구/프리셋/기록, UpdateAsync+세션 소유권/만료, 로드 실패 덮어쓰기 방지, 멱등 거래, 자동/종료 저장, fake 어댑터 시험. 실제 cloud와 fake 검증 구분. 루틴 IO는 높은 추론이 불필요하면 낮추되 데이터 무결성 판단은 high. 결과 .setup/handoffs/profiles.json.
+@NightShift-Economy: 계약의 CommerceService.luau/ProgressionService.luau 및 각 spec. 8점포 공용 도매 재고, 유한 SKU/희귀 재입고/매장 주문 상한, 서버 단위 주문 예약·결제·취소 원자 처리, 점포 운영자금/개인 저장머니 분리, 상품 수량/선반 슬롯/직접진열·판매·영구보상·레벨 해금. 실패/중복/동시 마지막재고 검사. 결과 .setup/handoffs/economy.json.
+@NightShift-Delivery: DeliveryService.luau 및 spec. 주문 큐→실제 트럭→하역·운반→진열, 상품 고유ID/소유/상태, 짐칸과 진열상품 도난, 경보/피해점포 위치/초보·피해점포 cooldown/회수/사망·이탈·트럭회수. 엔진주입어댑터와 순수상태검사. 다른 점포 방문을 허용하고 관리권한과 도난행동을 구분. 결과 .setup/handoffs/delivery.json.
+@NightShift-World: tools/world/만. 직선도로 양쪽4+4 총8매장. 실제 입구·인도·사무실PC·창고·하역공간·진열 슬롯·트럭 이동/정차 마커·알람광원. 기존+배치교체. 직접Part/텍스트무료제작, 16명목표 저부하, 네비게이션/폐쇄통로/중복마커 검증. 결과 .setup/handoffs/world-commerce.json.
+각 handoff JSON에 changedFiles,testsRun,unverified,blockingIssues를 작성(짧게). 공용 계약/기존 Main 등 담당외변경금지, 필요시Moderator에게구체적요청. 구현중 큰 독립 작업은 파일소유권을 분리해 별도worker등록 가능하되 총4 초과하지 말것. Moderator는 실제파일·핵심계약만 검토, 문서보고만을위한추가턴 금지. 네결과완료후 [STAGE_READY:COMMERCE_FOUNDATIONS]. Studio/게시/유료API/실제판매 금지.
+

@@ -1,0 +1,4 @@
+[
+ {"tool":"execute_luau","arguments":{"datamodel_type":"Client"},"codeFile":"tools/integration/rebind-check.luau","label":"synthetic unload automatic recovery"},
+ {"tool":"get_console_output","label":"post completion console"}
+]

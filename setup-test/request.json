@@ -1,0 +1,21 @@
+{
+  "testId": "nightshift-maestro-handshake-20261031-a7c9",
+  "purpose": "Verify real Maestro moderator-to-Codex-worker communication using ChatGPT subscription authentication",
+  "nonce": "NIGHTSHIFT-A7C9",
+  "input": {
+    "completedOrders": 5,
+    "requiredOrders": 5,
+    "blackoutResolved": true,
+    "shiftFinished": false
+  },
+  "rule": "Success requires completedOrders >= requiredOrders AND blackoutResolved AND shiftFinished",
+  "workerOutput": "setup-test/worker-report.json",
+  "requirements": [
+    "Read this file using a real file tool",
+    "Compute success from the given input",
+    "Write only the assigned worker output file",
+    "Return the nonce and explanation to the moderator",
+    "Do not claim that Roblox Studio or gameplay has been tested",
+    "Do not spawn additional agents for this small test"
+  ]
+}

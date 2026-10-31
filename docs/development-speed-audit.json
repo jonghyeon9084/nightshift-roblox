@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "auditedAt": "2026-10-31",
+  "timezone": "Asia/Seoul",
+  "language": "ko",
+  "scope": "로컬 증거 읽기 전용 분석. Studio 재실행·추가 AI 실행·게시 없음.",
+  "sources": {
+    "runner": ".setup/runner/events.jsonl",
+    "groupsRoot": "%APPDATA%/maestro/group-chats/",
+    "groupFiles": ["history.jsonl", "metadata.json"],
+    "groups": {
+      "design": "1b173ae8-cdf9-4c78-8f2b-280078ceff78",
+      "contract": "0af2a920-0148-45f3-b742-1e50b4c7e5d0",
+      "build": "96a2ad59-f9ba-45fe-a1fa-a9097447cf8d",
+      "review": "a112355a-77ff-4365-a776-6dc60ab11c55",
+      "integration": "3d27d6e6-a9b8-4e16-a372-04d7ff6b420e"
+    },
+    "reports": ["docs/implementation/build-report.md", "docs/implementation/code-review.md", "docs/implementation/integration-report.md"],
+    "studioEvents": ".setup/integration/events.jsonl",
+    "sessionMetadataPolicy": "Codex 세션의 type, timestamp, turn_context model/effort, 도구 호출 건수만 보고. 추론·메시지·명령 인수·도구 결과·인증 미반환."
+  },
+  "stageDurations": [
+    {"stage": "scale", "startKst": "17:59:13", "endKst": "18:24:10", "seconds": 1497, "source": "group history: 확장 요청부터 최종 응답"},
+    {"stage": "contract", "startKst": "18:24:17", "endKst": "18:34:49", "seconds": 632, "source": "group history"},
+    {"stage": "build", "startKst": "18:34:57", "endKst": "19:07:24", "seconds": 1947, "source": "group history"},
+    {"stage": "review", "startKst": "19:07:28", "endKst": "19:16:46", "seconds": 558, "source": "group history"},
+    {"stage": "integration", "startKst": "19:16:52", "endKst": "19:46:28", "seconds": 1776, "source": "group history"}
+  ],
+  "parallelBuild": {
+    "delegatedAtKst": "18:36:57",
+    "workerResults": [
+      {"role": "World", "replyKst": "18:44:35", "elapsedMs": 457846, "sessionId": "01a19151-cfa7-7023-9bb3-28845c1ca078", "sessionStartUtc": "2026-10-31T09:37:05.626Z", "sessionEndUtc": "2026-10-31T09:44:34.212Z", "observedModel": "gpt-6.1-sol", "observedEffort": "medium", "sessionToolCalls": 21},
+      {"role": "UI", "replyKst": "18:50:24", "elapsedMs": 806700, "sessionId": "01a19151-cf77-79a1-bed0-9d194568aea7", "sessionStartUtc": "2026-10-31T09:37:05.815Z", "sessionEndUtc": "2026-10-31T10:06:05.471Z", "observedModel": "gpt-6.1-sol", "observedEffort": "medium", "sessionToolCalls": 49, "toolCountNote": "최초 구현과 후속 트레이 수정·보고서 작성의 3턴 전체"},
+      {"role": "Server", "replyKst": "18:54:08", "elapsedMs": 1031000, "sessionId": "01a19151-ccf2-7632-bcfd-ee257d9eda1c", "sessionStartUtc": "2026-10-31T09:37:05.783Z", "sessionEndUtc": "2026-10-31T09:54:07.369Z", "observedModel": "gpt-6-astra", "observedEffort": "high", "sessionToolCalls": 30}
+    ],
+    "observedPeakConcurrentWorkers": 3,
+    "threeWayOverlapSecondsApprox": 448,
+    "registeredWorkerCount": null,
+    "registeredWorkerCountNote": "이번 분석에서 전체 등록 수 미확정. 등록·그룹 참가·실제 동시 실행은 별도 값.",
+    "serialElapsedSumSecondsApprox": 2295.5,
+    "parallelCriticalWorkerSecondsApprox": 1031,
+    "arithmeticSavingsSecondsApprox": 1264.5,
+    "savingsLimitation": "동일 작업시간을 가정한 산술 비교이며 순차 대조 실험이나 향후 보장치가 아님."
+  },
+  "buildSerialTail": {
+    "startKst": "18:54:08", "endKst": "19:07:24", "seconds": 796,
+    "steps": [
+      {"work": "Moderator 계약·파일 검토", "secondsApprox": 194},
+      {"work": "누락 트레이 UI 수정", "secondsApprox": 194},
+      {"work": "수정 확인", "secondsApprox": 61},
+      {"work": "별도 빌드 보고서 작성", "secondsApprox": 270},
+      {"work": "최종 보고서 확인", "secondsApprox": 78}
+    ],
+    "note": "개별 반올림 합계와 전체 경과는 1초 차이 가능. 최종 서버 응답 후 직렬 꼬리로 구분."
+  },
+  "reviewLoops": {
+    "scaleFirstDraftKst": "18:10:02", "scaleFinalKst": "18:24:10", "afterFirstDraftSeconds": 848,
+    "scaleCauses": ["품목 회수 후 상태 복원 누락", "다인 정전 안내 충돌", "동시 반납·이탈 우선순위 잔여 모호성"],
+    "codeReviewIssues": ["CR-001 모바일 작업 버튼 파괴·재생성", "CR-002 거절된 로드 보고의 자동 복구 정지", "CR-003 Hub StoreSelect 진입 동작 누락"],
+    "judgment": "실제 결함을 발견한 의존적 수정 왕복. 독립 검토를 생략할 근거가 아님."
+  },
+  "integration": {
+    "recordedToolCalls": 56,
+    "firstUtc": "2026-10-31T10:22:55.093Z", "lastUtc": "2026-10-31T10:38:58.368Z",
+    "toolCounts": {"execute_luau": 21, "get_console_output": 10, "get_studio_state": 12, "list_roblox_studios": 2, "screen_capture": 2, "start_stop_play": 9},
+    "reworkReported": ["기본 MCP 실행 경로 부재 해결", "네비게이션 Success와 실제 도착 불일치 우회", "Stop RPC 시간초과 후 상태 확인", "서버 시작 바닥 검사 오류", "정전 빈 역할 false 값 오류"],
+    "limitation": "도구 호출 기록은 호출별 실제 연산시간이나 PC 부하를 측정하지 않음. 오류별 지연 초수는 미산정."
+  },
+  "improvements": [
+    {"priority": 1, "action": "초기 위임 완료 조건에 계산대 트레이 등 계약 기능 체크리스트와 동시 사건 우선순위 예시를 포함", "reason": "누락 수정·설계 왕복 감소", "measuredFutureCriterion": "계약 누락 재위임 횟수와 최초 구현 이후 직렬 꼬리 초수"},
+    {"priority": 2, "action": "각 담당 완료 보고를 변경 파일·검증 경로·미검증 항목으로 구조화하고 최종 보고서는 짧게 집계", "reason": "별도 보고서 작성 270초와 최종 확인 78초의 축소 여지", "limitation": "실제 절감량 미측정"},
+    {"priority": 3, "action": "Studio 경로 탐지·소스 설치·최소 시작 스모크 검사를 재사용", "reason": "통합 환경 복구와 늦은 시작 오류 재발 방지"},
+    {"priority": 4, "action": "활동 지도에 현재 턴의 최근 이벤트·도구 시각·호출 건수만 표시", "reason": "그룹 기록은 최종 응답 중심이어서 긴 실행이 무통신처럼 보일 수 있음", "limitation": "도구 활동 메타는 게임 진행률·성공·현재 실행 여부의 확정 증거가 아님"}
+  ],
+  "independentTaskCandidates": [
+    {"role": "UI", "ownedFiles": ["src/client/"], "task": "작은 화면 HUD·스크롤·안정된 버튼·터치 경로 개선", "completion": "공유 필드 변경 없이 구현·오프라인 검증·Studio 확인 항목 인계"},
+    {"role": "ServerTest", "ownedFiles": ["src/server/tests/"], "task": "동시 반납·이탈, 역전 요청, 빈 정전 역할의 결정적 회귀 검사", "completion": "실제 검사 결과와 한계 보고. 정책·다른 소스 변경은 메인 조율"},
+    {"role": "World", "ownedFiles": ["tools/world/"], "task": "야간 가독성·점포 안내·통로 시각 개선과 객체 예산 검사", "completion": "맵 파일·검증 결과 인계. 전역 Lighting·정원 설정·Studio는 통합 담당 단독"}
+  ],
+  "ineffectiveParallelism": ["공유 계약 동시 편집", "단일 Studio의 복수 작성자", "선행 수정이 필요한 재검토의 억지 병렬화", "보고서만을 위한 역할 증원"],
+  "limitations": ["PC CPU·메모리·네트워크·추론 지연 원인은 미측정", "구성 모델과 실제 실행 모델을 구분", "일부 그룹 elapsed 값은 표시 자리에서 반올림", "현재 활성 워커 수를 과거 참가 명단으로 추정하지 않음", "미실행 2인·16인·모바일 검증은 통과로 표시하지 않음"]
+}

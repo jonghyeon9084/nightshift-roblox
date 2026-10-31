@@ -1,0 +1,14 @@
+{
+  "scope": "continuous-local-game-development-through-playable-mvp",
+  "statusSource": ".setup/runner/state.json and local runner /health",
+  "mode": "resident-event-driven",
+  "minuteAutomation": "deleted",
+  "pipeline": "tools/development-pipeline.json",
+  "chatName": "NightShift-Design",
+  "chatId": "1b173ae8-cdf9-4c78-8f2b-280078ceff78",
+  "workers": ["NightShift-Planner", "NightShift-DesignReview"],
+  "nextStep": "Resident runner adopts the current scale design. Actual moderator completion plus verified artifacts advances immediately to shared contract, parallel world/server/UI implementation, independent code review, and exclusive Studio integration/playtest/fixes. Final evidence must be reviewed before calling the game verified. No minute schedule or stage-by-stage reapproval.",
+  "requiresUserAction": false,
+  "completed": false,
+  "resumeOnlyOnNewEvidenceAfterCompletion": true
+}
