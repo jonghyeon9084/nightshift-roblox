@@ -2,6 +2,8 @@
 const crypto = require('node:crypto');
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const busy = chat => chat && (chat.isActive || !['idle', 'stopped'].includes(chat.state));
+const fatalProblem = message => /(?:usage.?limit|rate.?limit|authentication|not logged in|사용\s*한도|인증\s*(?:실패|필요))/i.test(message||'');
+const exactParticipants=(chat,stage)=>chat.participants.length===stage.participants.length&&stage.participants.every(p=>chat.participants.some(member=>member.name===p));
 const user = m => m.role === 'user' || m.participantName === 'user';
 const ordered = chat => [...(chat.messages || [])].sort((a, b) => a.timestamp - b.timestamp);
 const latestUser = chat => ordered(chat).filter(user).at(-1);
@@ -38,7 +40,7 @@ function validateManifest(manifest) {
     if (!Array.isArray(s.requiredFiles) || !s.requiredFiles.every(p => typeof p === 'string' && p)) throw Error(`Invalid requiredFiles: ${s.id}`);
     if (s.adoptExisting && i !== 0) throw Error('Only the initial stage may adopt existing work');
     for (const [role, tier] of Object.entries(s.modelAssignments || {})) {
-      if (!s.participants.includes(`NightShift-${role}`) || !['simple', 'standard', 'complex'].includes(tier)) throw Error(`Invalid model assignment: ${s.id}`);
+      if (!s.participants.includes(`NightShift-${role}`) || !Object.hasOwn(require('../model-policy.json').tiers,tier)) throw Error(`Invalid model assignment: ${s.id}`);
     }
   }
 }
@@ -57,9 +59,9 @@ class PipelineRunner {
     this.store.write(this.state);
   }
   event(kind, extra = {}) { this.store.event({ at: new Date(this.clock()).toISOString(), kind, stageId: this.state.stageId, chatId: this.state.chatId, ...extra }); }
-  attention(reason) { this.save({ status: 'attention', reason }); this.event('attention', { reason }); }
+  attention(reason) { this.save({ status: 'attention', reason, ...(fatalProblem(reason)?{halt:{kind:'limit-auth',reason,at:new Date(this.clock()).toISOString()}}:{}) }); this.event('attention', { reason }); }
   capacityAvailable(chats, stage, chatId) {
-    const maximum = this.manifest.maxWorkers ?? 3;
+    const maximum = Math.min(this.manifest.maxWorkers ?? 3,this.adapter.capacityLimit?.()??4);
     if (stage.participants.length > maximum) { this.attention(`Stage ${stage.id} requests ${stage.participants.length} workers above maxWorkers ${maximum}`); return false; }
     const occupied = chats.filter(c => c.id !== chatId && busy(c)).reduce((sum, c) => sum + (c.participants?.length || 3), 0);
     if (occupied + stage.participants.length <= maximum) return true;
@@ -70,15 +72,18 @@ class PipelineRunner {
     return false;
   }
   resume() {
+    if(this.state.halt)throw Error('Usage/authentication halt is retained; verify the account limit before operator recovery');
     if (this.state.manifestHash !== this.manifestHash) throw Error('Manifest changed; retain checkpoint and review before resetting');
-    if (this.state.status === 'attention') { this.save({ status: this.state.checkpoint ? 'running' : 'ready', reason: null, idleSince: null }); this.event('operator-resume'); }
+    const effectiveStatus = this.state.status === 'stopped' ? this.state.resumeStatus : this.state.status;
+    if (effectiveStatus === 'attention') { this.save({ status: this.state.checkpoint ? 'running' : 'ready', resumeStatus: null, reason: null, idleSince: null }); this.event('operator-resume'); }
   }
-  async tick() {
+  async tick({allowDispatch=true}={}) {
     if (this.stopRequested || this.locked || ['attention', 'awaiting-review'].includes(this.state.status)) return;
     this.locked = true;
     try {
       if (this.state.manifestHash !== this.manifestHash) return this.attention('Manifest changed after checkpoint; manual review required');
       if (this.state.status === 'stopped') this.save({ status: this.state.resumeStatus || (this.state.checkpoint ? 'running' : 'ready'), resumeStatus: null });
+      if (['attention', 'awaiting-review'].includes(this.state.status)) return;
       // Each completed stage advances here in the same tick, with no timer delay.
       for (let remaining = this.manifest.stages.length * 3 + 1; remaining > 0; remaining--) {
         if (this.stopRequested) return;
@@ -89,7 +94,7 @@ class PipelineRunner {
         if (matches.length > 1) return this.attention(`Duplicate chat name: ${stage.chatName}`);
         let chat = matches[0] ? await this.adapter.status(matches[0].id) : null;
         if (this.state.chatId && (!chat || chat.id !== this.state.chatId)) return this.attention('Checkpoint chat disappeared or changed');
-        if (chat && !stage.participants.every(p => chat.participants.some(member => member.name === p))) return this.attention('Required participants missing from existing chat');
+        if (chat && !exactParticipants(chat,stage)) return this.attention('Existing chat participants differ from the exact assigned set');
         if (this.state.checkpoint) {
           if (!chat) return this.attention('Dispatch result cannot be reconciled: chat missing');
           if (this.state.checkpoint.phase === 'prepared') {
@@ -104,16 +109,24 @@ class PipelineRunner {
           this.save({ status: 'running', chatId: chat.id, checkpoint: { phase: 'adopted', startAt: opening.timestamp, userIdentity: identity(opening), userHash: hash(opening.content || ''), baseline: {}, adoptedAt: this.clock() }, idleSince: null });
           this.event('adopted', { startAt: opening.timestamp, userMessageHash: hash(opening.content || '') });
         } else {
+          if(!allowDispatch)return;
           if (busy(chat)) return this.attention('Existing chat is busy with unexpected work; dispatch refused');
           if (!this.capacityAvailable(chats, stage, chat?.id)) return;
+          const resourceReason=await this.adapter.canDispatch?.(stage,chats,chat?.id);
+          if(resourceReason){const changed=this.state.reason!==resourceReason||this.state.status!=='waiting-resources';this.save({status:'waiting-resources',reason:resourceReason});if(changed)this.event('waiting-resources',{reason:resourceReason});return;}
           const conflict = chats.find(c => c.id !== chat?.id && busy(c) && c.participants.some(p => stage.participants.includes(p.name)));
           if (conflict) return this.attention(`Participant busy in another chat: ${conflict.topic}`);
           const prompt = this.files.readPrompt(stage.promptFile);
           if (!prompt.trim()) return this.attention('Empty stage prompt');
+          await this.adapter.prepareDispatch?.(stage);
           for (const [role, tier] of Object.entries(stage.modelAssignments || {})) await this.adapter.setModel(role, tier);
           // Recheck after model assignment; CLI itself also refuses busy sends.
-          if (chat) { chat = await this.adapter.status(chat.id); if (busy(chat)) return this.attention('Chat became active before dispatch'); }
-          if (!this.capacityAvailable(await this.adapter.list(), stage, chat?.id)) return;
+          if (chat) { chat = await this.adapter.status(chat.id); if (busy(chat)) return this.attention('Chat became active before dispatch');if(!exactParticipants(chat,stage))return this.attention('Existing chat participants changed before dispatch'); }
+          const freshChats=await this.adapter.list();
+          if (!this.capacityAvailable(freshChats, stage, chat?.id)) return;
+          if(freshChats.some(c=>c.id!==chat?.id&&busy(c)&&c.participants.some(p=>stage.participants.includes(p.name))))return this.attention('Participant became busy before dispatch');
+          const freshReason=await this.adapter.canDispatch?.(stage,freshChats,chat?.id);
+          if(freshReason){this.save({status:'waiting-resources',reason:freshReason});this.event('waiting-resources',{reason:freshReason});return;}
           if (this.stopRequested) return;
           const preparedAt = this.clock(), dispatchId = this.uuid();
           const wirePrompt = `${prompt.trimEnd()}\n\n[RUNNER_DISPATCH:${stage.id}:${dispatchId}]\n`;
@@ -122,7 +135,7 @@ class PipelineRunner {
           this.save({ status: 'dispatching', reason: null, chatId: chat?.id || null, idleSince: null, checkpoint: { phase: 'prepared', preparedAt, dispatchId, promptHash: hash(prompt), wireHash: hash(wirePrompt), messageFile, baseline } });
           this.event('dispatch-prepared', { dispatchId, promptHash: hash(prompt) });
           try { await this.adapter.dispatch(stage, chat, messageFile); }
-          catch (error) { this.event('dispatch-error', { reason: error.message }); /* Reconcile below; a timeout is not proof no message was sent. */ }
+          catch (error) { this.event('dispatch-error', { reason: error.message });if(fatalProblem(error.message))return this.attention(error.message); /* Non-limit errors reconcile below; a timeout is not proof no message was sent. */ }
           // Always verify actual persisted user text, even after an apparently successful CLI response.
           continue;
         }
@@ -163,4 +176,4 @@ class PipelineRunner {
   requestStop() { this.stopRequested = true; }
   stop() { this.save({ resumeStatus: this.state.status, status: 'stopped' }); this.event('stopped', { inFlightPreserved: true }); }
 }
-module.exports = { PipelineRunner, validateManifest, hash, busy };
+module.exports = { PipelineRunner, validateManifest, hash, busy, fatalProblem };

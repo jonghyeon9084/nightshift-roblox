@@ -1,0 +1,5 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수.
+@NightShift-PoolReview 는 NightShift-Dashboard 소속 임시 독립 검토 워커다. 루트가 새 worker pool과 model routing을 구현했으며 실제 실행 중 그룹을 중복호출하지 않고 active/inactive/parent 표시를 추가 중이다.
+읽을 파일 tools/runner/{pool.cjs,pool.test.cjs,resident.cjs,pipeline.cjs,io.cjs}, tools/model-routing.cjs, tools/model-routing.test.cjs, tools/set-worker-model.cjs, tools/model-policy.json, tools/worker-pool.json. 코드/설정/Studio/다른 프로세스를 변경하지 않는다. 소유 파일 docs/implementation/worker-pool-review.md만 작성.
+명확한 결함을 독립 검토하라: 재시작/완료 후 재발행, 추론·모델 지원검사, 한도·인증 중단, 선행 의존성/파일 충돌, 동시수, 메모리 부족, 데이터 표시의 실제근거, immutable dispatch, task 추가/변경 시 안전성. 임의 일반론보다 재현 가능한 문제와 파일·라인·수정안을 보고. 필요시 별도 임시 디렉터리 mock 테스트만 허용하며 실제 AI 추가호출/구독/Studio 조작금지. 기존 테스트만 필요한 만큼 실행.
+최종 보고에는 심각도/증거/수정안 및 실제 확인/미확인을 구분. 문제 0개도 근거를 남겨라. 메인이 수정하고 검토한다. 기계적으로 무제한 반복하지 않는다. Moderator가 보고파일 확인 후 [STAGE_READY:WORKER_POOL_REVIEW]를 단독 마지막 줄에 출력.

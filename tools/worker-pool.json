@@ -1,0 +1,293 @@
+{
+  "version": 1,
+  "maxWorkers": 4,
+  "minFreeMemoryMB": 512,
+  "tasks": [
+    {
+      "id": "worker_hierarchy_ui",
+      "title": "부모·하위 워커 전체 지도",
+      "worker": "NightShift-Dashboard",
+      "parentName": null,
+      "temporary": false,
+      "workload": "interface",
+      "dependsOn": [],
+      "writes": [
+        "tools/mission-control/fleet.js",
+        "tools/mission-control/model.js",
+        "tools/mission-control/app.js",
+        "tools/mission-control/style.css",
+        "tools/mission-control/index.html",
+        "tools/mission-control/hierarchy.test.cjs",
+        "docs/implementation/worker-hierarchy-ui.md"
+      ],
+      "reads": [],
+      "chatName": "NightShift-WorkerHierarchyUI",
+      "promptFile": "setup-test/worker-hierarchy-ui-prompt.txt",
+      "completionMarker": "[STAGE_READY:WORKER_HIERARCHY_UI]",
+      "requiredFiles": [
+        "docs/implementation/worker-hierarchy-ui.md"
+      ],
+      "adoptExisting": true
+    },
+    {
+      "id": "map_performance",
+      "title": "지도 상태 조회 성능 개선",
+      "worker": "NightShift-PerfAudit",
+      "parentName": "NightShift-Dashboard",
+      "temporary": true,
+      "workload": "interface",
+      "dependsOn": [],
+      "writes": [
+        "tools/mission-control/server.cjs",
+        "tools/mission-control/poll-cache.cjs",
+        "tools/mission-control/poll-cache.test.cjs",
+        "docs/implementation/map-performance.md"
+      ],
+      "reads": [],
+      "chatName": "NightShift-MapPerformance",
+      "promptFile": "setup-test/map-performance-prompt.txt",
+      "completionMarker": "[STAGE_READY:MAP_PERFORMANCE]",
+      "requiredFiles": [
+        "docs/implementation/map-performance.md"
+      ],
+      "adoptExisting": true
+    },
+    {
+      "id": "worker_pool_review",
+      "title": "상주 워커 배정 독립 검토",
+      "worker": "NightShift-PoolReview",
+      "parentName": "NightShift-Dashboard",
+      "temporary": true,
+      "workload": "review",
+      "dependsOn": [],
+      "writes": [
+        "docs/implementation/worker-pool-review.md"
+      ],
+      "reads": [
+        "tools/runner",
+        "tools/model-routing.cjs",
+        "tools/model-policy.json",
+        "tools/set-worker-model.cjs"
+      ],
+      "chatName": "NightShift-WorkerPoolReview",
+      "promptFile": "setup-test/pool-review-prompt.txt",
+      "completionMarker": "[STAGE_READY:WORKER_POOL_REVIEW]",
+      "requiredFiles": [
+        "docs/implementation/worker-pool-review.md"
+      ]
+    },
+    {
+      "id": "truck_warehouse_world",
+      "title": "트럭·실제 창고·바닥 겹침 수정",
+      "worker": "NightShift-TruckWorld",
+      "parentName": "NightShift-World",
+      "temporary": true,
+      "workload": "code",
+      "dependsOn": [],
+      "writes": [
+        "tools/world",
+        "docs/implementation/truck-warehouse-world.md"
+      ],
+      "reads": [
+        "src/shared",
+        "docs/implementation/commerce-contract.md"
+      ],
+      "chatName": "NightShift-TruckWarehouseWorld",
+      "promptFile": "setup-test/truck-warehouse-world-prompt.txt",
+      "completionMarker": "[STAGE_READY:TRUCK_WAREHOUSE_WORLD]",
+      "requiredFiles": [
+        "docs/implementation/truck-warehouse-world.md"
+      ]
+    },
+    {
+      "id": "warehouse_server",
+      "title": "실제 창고 재고·운반 서버 연결",
+      "worker": "NightShift-StoreStorage",
+      "parentName": "NightShift-Server",
+      "temporary": true,
+      "workload": "code",
+      "risks": [
+        "currency",
+        "concurrency"
+      ],
+      "dependsOn": [],
+      "writes": [
+        "src/server",
+        "docs/implementation/warehouse-server.md"
+      ],
+      "reads": [
+        "src/shared",
+        "docs/implementation/commerce-contract.md"
+      ],
+      "chatName": "NightShift-WarehouseServer",
+      "promptFile": "setup-test/warehouse-server-prompt.txt",
+      "completionMarker": "[STAGE_READY:WAREHOUSE_SERVER]",
+      "requiredFiles": [
+        "docs/implementation/warehouse-server.md"
+      ]
+    },
+    {
+      "id": "warehouse_ui",
+      "title": "사무실 PC 주문·창고 이용 화면",
+      "worker": "NightShift-WarehouseUI",
+      "parentName": "NightShift-UI",
+      "temporary": true,
+      "workload": "interface",
+      "dependsOn": [],
+      "writes": [
+        "src/client",
+        "docs/implementation/warehouse-ui.md"
+      ],
+      "reads": [
+        "src/shared",
+        "docs/implementation/commerce-contract.md"
+      ],
+      "chatName": "NightShift-WarehouseUI",
+      "promptFile": "setup-test/warehouse-ui-prompt.txt",
+      "completionMarker": "[STAGE_READY:WAREHOUSE_UI]",
+      "requiredFiles": [
+        "docs/implementation/warehouse-ui.md"
+      ]
+    },
+    {
+      "id": "warehouse_review",
+      "title": "트럭·창고·PC 주문 독립 검토",
+      "worker": "NightShift-Review",
+      "parentName": null,
+      "temporary": false,
+      "workload": "review",
+      "dependsOn": [
+        "truck_warehouse_world",
+        "warehouse_server",
+        "warehouse_ui"
+      ],
+      "writes": [
+        "docs/implementation/warehouse-review.md"
+      ],
+      "reads": [
+        "src",
+        "tools/world",
+        "docs/implementation/truck-warehouse-world.md",
+        "docs/implementation/warehouse-server.md",
+        "docs/implementation/warehouse-ui.md"
+      ],
+      "chatName": "NightShift-WarehouseReview",
+      "promptFile": "setup-test/warehouse-review-prompt.txt",
+      "completionMarker": "[STAGE_READY:WAREHOUSE_REVIEW]",
+      "requiredFiles": [
+        "docs/implementation/warehouse-review.md"
+      ]
+    },
+    {
+      "id": "warehouse_integration",
+      "title": "트럭·창고 설치와 이동 중 바닥 플레이 검증",
+      "worker": "NightShift-Integrator",
+      "parentName": null,
+      "temporary": false,
+      "workload": "integration",
+      "dependsOn": [
+        "warehouse_review"
+      ],
+      "writes": [
+        "src",
+        "tools/world",
+        "tools/integration",
+        "@studio",
+        "docs/implementation/warehouse-integration.md",
+        ".setup/warehouse-verification.json"
+      ],
+      "reads": [
+        "docs/implementation/warehouse-review.md",
+        "docs/implementation/truck-warehouse-world.md",
+        "docs/implementation/warehouse-server.md",
+        "docs/implementation/warehouse-ui.md"
+      ],
+      "chatName": "NightShift-WarehouseIntegration",
+      "promptFile": "setup-test/warehouse-integration-prompt.txt",
+      "completionMarker": "[STAGE_READY:WAREHOUSE_INTEGRATION]",
+      "requiredFiles": [
+        "docs/implementation/warehouse-integration.md",
+        ".setup/warehouse-verification.json"
+      ]
+    },
+    {
+      "id": "korean_store_design",
+      "title": "한국 편의점 공간·LCD·트럭 광고 기획",
+      "worker": "NightShift-StoreDesign",
+      "parentName": "NightShift-World",
+      "temporary": true,
+      "workload": "planning",
+      "dependsOn": [],
+      "writes": [
+        "docs/design/korean-store-reference.md",
+        "docs/design/advertiser-content.md"
+      ],
+      "reads": [
+        "docs/implementation/commerce-contract.md",
+        "docs/implementation/advertising.md",
+        "docs/game-brief.md"
+      ],
+      "chatName": "NightShift-KoreanStoreDesign",
+      "promptFile": "setup-test/korean-store-design-prompt.txt",
+      "completionMarker": "[STAGE_READY:KOREAN_STORE_DESIGN]",
+      "requiredFiles": [
+        "docs/design/korean-store-reference.md",
+        "docs/design/advertiser-content.md"
+      ]
+    },
+    {
+      "id": "store_design_review",
+      "title": "편의점 공간·광고 독립 기획 검토",
+      "worker": "NightShift-DesignReview",
+      "parentName": null,
+      "temporary": false,
+      "workload": "review",
+      "dependsOn": [
+        "korean_store_design"
+      ],
+      "writes": [
+        "docs/design/store-design-review.md"
+      ],
+      "reads": [
+        "docs/design/korean-store-reference.md",
+        "docs/design/advertiser-content.md",
+        "docs/implementation/commerce-contract.md",
+        "docs/implementation/advertising.md"
+      ],
+      "chatName": "NightShift-StoreDesignReview",
+      "promptFile": "setup-test/store-design-review-prompt.txt",
+      "completionMarker": "[STAGE_READY:STORE_DESIGN_REVIEW]",
+      "requiredFiles": [
+        "docs/design/store-design-review.md"
+      ]
+    },
+    {
+      "id": "next_game_plan",
+      "title": "플레이 결과에 근거한 다음 개선 기획",
+      "worker": "NightShift-Planner",
+      "parentName": null,
+      "temporary": false,
+      "workload": "planning",
+      "dependsOn": [
+        "warehouse_integration",
+        "store_design_review"
+      ],
+      "writes": [
+        "docs/design/next-iteration.md"
+      ],
+      "reads": [
+        "docs/implementation/warehouse-integration.md",
+        "docs/implementation/commerce-integration-report.md",
+        "docs/design/store-design-review.md",
+        "docs/game-brief.md",
+        "docs/design/retention-plan.md"
+      ],
+      "chatName": "NightShift-NextGamePlan",
+      "promptFile": "setup-test/next-game-plan-prompt.txt",
+      "completionMarker": "[STAGE_READY:NEXT_GAME_PLAN]",
+      "requiredFiles": [
+        "docs/design/next-iteration.md"
+      ]
+    }
+  ]
+}

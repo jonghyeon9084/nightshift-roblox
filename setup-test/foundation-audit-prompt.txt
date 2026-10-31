@@ -1,0 +1,7 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md를 읽는다. 이 작업은 다른 그룹의 서버·UI 연결 및 Moderator 검토와 독립적으로 수행하는 조기 데이터 무결성 감사다. @NightShift-Worker 에 아래 작업만 위임하라.
+
+기준은 현재 Git commit c5d3b22의 완료된 기초 모듈이다. git show c5d3b22:src/server/Modules/ProfileService.luau, CommerceService.luau, ProgressionService.luau, DeliveryService.luau 및 대응 tests, src/shared/CommerceConfig.luau와 commerce-contract를 필요한 범위만 읽는다. 현재 작업 트리의 서버·UI는 다른 담당이 수정하므로 코드 변경하지 않는다.
+
+저장 실패 후 기본값 덮기, 세션 소유권·만료·재접속, 중복 거래·개인돈 복제, 마지막 공용 재고 경합, 도난/회수의 상품 고유성·권한을 검토한다. 기존 통과 검사를 다시 나열하는 보고가 아니라 빠진 실제 경계 사례와 재현 가능한 결함만 찾는다. 의심만 있으면 근거와 미확인 조건을 분리한다. 필요하면 .setup/early-audit 안에 격리 재현 자료를 작성하고, 실제 모듈은 수정하지 않는다. Studio·외부 API·계정·게시·판매·로그인 정보 접근 금지.
+
+파일 소유권: docs/implementation/foundation-audit.md 및 .setup/early-audit/만. 결과는 기준 commit, 변경 파일, 실제 수행한 확인, P0/P1/P2 발견(file:line/재현/최소수정/검증), 미검증 사항을 짧게 작성한다. 문제가 없으면 검토 범위 내 확인된 문제 없음이라고 명시한다. 후속 정식 검토/통합 담당이 이 보고를 재사용한다. 대규모 문서 재작성·보고서만 위한 추가턴 금지. 완료하면 Moderator는 결과 존재 확인 후 [FOUNDATION_AUDIT_DONE] 한 줄로 끝낸다.

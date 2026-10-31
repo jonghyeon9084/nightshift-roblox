@@ -53,8 +53,45 @@
   if(dev.status==='attention')return {title:'개발 정지·확인 필요',reason:/settled idle.*completion marker/i.test(dev.reason||'')?'응답은 끝났지만 완료 표식을 확인하지 못했습니다.':dev.reason||'다음 단계로 진행하지 못했습니다.',working:false};
   if(dev.status==='awaiting-review')return {title:'등록 작업 완료·후속 검토',reason:'등록된 단계가 끝났습니다. 실제 검증 결과와 후속 작업을 확인합니다.',working:false};
   if(!dev.alive||dev.status==='stopped')return {title:'개발 실행기 중지',reason:dev.reason||'실행 중인 상주 개발 작업이 없습니다.',working:false};
-  const titles={running:'개발 진행 중',ready:'개발 준비 중',dispatching:'다음 작업 전달 중','waiting-capacity':'워커 작업 완료 대기'};
+  const titles={running:'개발 진행 중',ready:'개발 준비 중',dispatching:'다음 작업 전달 중','waiting-capacity':'워커 작업 완료 대기','waiting-resources':'파일·메모리 대기'};
   return {title:titles[dev.status]||'개발 상태 확인 필요',reason:dev.reason||'',working:Object.hasOwn(titles,dev.status)};
  }
- return {view,routes,targets,nodeKey,participants,createTracker,modelInfo,connectionPath,pathPoint,activityText,developmentStatus,label:name=>labels[name]||name.replace(/^NightShift-/, '')};
+ // Registry/pool state is metadata, never evidence of a message or a running turn.
+ function workers(state){
+  const byName=new Map();
+  for(const a of state.agents||[])if(a.name)byName.set(a.name,{...a});
+  for(const a of state.workerPool?.workers||[])if(a.name)byName.set(a.name,{...byName.get(a.name),...a});
+  for(const c of state.chats||[])for(const name of participants(c))if(!byName.has(name))byName.set(name,{name});
+  byName.delete('moderator');byName.delete('orchestrator');
+  const list=[...byName.values()];
+  for(const a of list){
+   const parent=a.parentName;let cursor=parent;const seen=new Set([a.name]);let invalid=false;
+   while(cursor&&cursor!=='moderator'&&cursor!=='orchestrator'){
+    if(seen.has(cursor)||!byName.has(cursor)){invalid=true;break;}seen.add(cursor);cursor=byName.get(cursor).parentName;
+   }
+   a.parent=invalid||!parent||['moderator','orchestrator'].includes(parent)?'orchestrator':parent;
+   a.parentIssue=invalid?'알 수 없는 부모 또는 순환 관계 · 루트에 표시':'';
+  }
+  return list;
+ }
+ function hierarchyLayout(list,availableWidth=320){
+  const children=new Map();for(const a of list){if(!children.has(a.parent))children.set(a.parent,[]);children.get(a.parent).push(a);}
+  const ordered=[];function visit(a){ordered.push(a);for(const child of children.get(a.name)||[])visit(child);}
+  for(const a of children.get('orchestrator')||[])visit(a);
+  // Every registered/queued worker stays visible; DFS keeps each family adjacent.
+  const n=ordered.length,rx=340,ry=availableWidth>=700?245:300;
+  const unit=ordered.map((a,i)=>{const angle=-Math.PI/2+i*2*Math.PI/Math.max(1,n);return {name:a.name,x:rx*Math.cos(angle),y:ry*Math.sin(angle)};});
+  let scale=1;
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)scale=Math.max(scale,Math.min(144/(Math.abs(unit[i].x-unit[j].x)||.0001),64/(Math.abs(unit[i].y-unit[j].y)||.0001)));
+  const width=Math.ceil(rx*scale*2+184),height=Math.ceil(ry*scale*2+110),center={x:width/2,y:height/2},coords={orchestrator:center};
+  for(const p of unit)coords[p.name]={x:center.x+p.x*scale,y:center.y+p.y*scale};
+  return {coords,width,height};
+ }
+ function workerStatus(worker,pending,connected=true){
+  if(!connected)return '마지막 기록 · '+workerStatus(worker,pending,true);
+  if(pending)return '실제 명령 수신 · 응답 대기';
+  if(worker.temporary&&['completed','complete','done','inactive'].includes(worker.status))return 'inactive(완료) · 재사용 가능';
+  return worker.status?'풀 상태: '+worker.status:'등록됨 · 대기';
+ }
+ return {workers,hierarchyLayout,workerStatus,view,routes,targets,nodeKey,participants,createTracker,modelInfo,connectionPath,pathPoint,activityText,developmentStatus,label:name=>labels[name]||name.replace(/^NightShift-/, '')};
 });

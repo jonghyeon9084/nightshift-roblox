@@ -233,6 +233,35 @@ test('graceful stop/restart preserves in-flight stage, and stop requested preven
   const g = fixture(); const paused = g.make(); paused.requestStop(); await paused.tick(); assert.equal(g.calls.length, 0);
 });
 
+test('normal restart preserves attention without performing another CLI lookup', async () => {
+  const f=fixture(); let runner=f.make(); await runner.tick();
+  runner.attention('Observed memory allocation failure'); runner.stop();
+  f.adapter.list=async()=>{throw Error('must not contact Maestro before explicit resume');};
+  runner=f.make(); await runner.tick();
+  assert.equal(f.state.status,'attention');
+  assert.equal(f.state.reason,'Observed memory allocation failure');
+  assert.equal(f.calls.filter(c=>c[0]==='dispatch').length,1);
+});
+
+test('explicit resume after graceful stop clears attention and preserves the sent checkpoint', async () => {
+  const f=fixture(); let runner=f.make(); await runner.tick();
+  const checkpoint=f.state.checkpoint;
+  runner.attention('Observed memory allocation failure'); runner.stop();
+  runner=f.make(); runner.resume(); await runner.tick();
+  assert.equal(f.state.status,'running'); assert.equal(f.state.reason,null);
+  assert.equal(f.state.resumeStatus,null); assert.deepEqual(f.state.checkpoint,checkpoint);
+  assert.equal(f.calls.filter(c=>c[0]==='dispatch').length,1);
+  assert.equal(f.events.filter(e=>e.kind==='operator-resume').length,1);
+});
+
+test('explicit resume after stop still refuses an ambiguous prepared dispatch', async () => {
+  const f=fixture(); f.adapter.dispatch=async()=>{f.calls.push(['dispatch','one']);throw Error('connection failed');};
+  let runner=f.make(); await runner.tick(); runner.stop();
+  runner=f.make(); runner.resume(); await runner.tick();
+  assert.equal(f.state.status,'attention'); assert.equal(f.state.checkpoint.phase,'prepared');
+  assert.equal(f.calls.filter(c=>c[0]==='dispatch').length,1);
+});
+
 test('model routing executes before a fresh idle dispatch, never on adopted work', async () => {
   const f = fixture([makeStage('one', { modelAssignments: { Test: 'simple' } })]); await f.make().tick();
   assert.deepEqual(f.calls, [['model', 'Test', 'simple'], ['dispatch', 'one']]);

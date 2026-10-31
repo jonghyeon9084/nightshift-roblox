@@ -7,3 +7,19 @@
 /* The entire graph uses one responsive coordinate space, including registry nodes. */
 .workspace>*{min-width:0}main,section,aside,header>div{min-width:0}select{max-width:100%}.toolbar label{max-width:100%}.toolbar select{flex:1;min-width:0}.group-title{cursor:pointer}.group-title text, text.group-title{fill:var(--accent);font-size:13px}.group-title:focus text{fill:white;text-decoration:underline}.group-sub{fill:var(--muted);font-size:11px}.group-divider{stroke:var(--line);fill:none}.packet{fill:var(--accent);cursor:pointer;stroke:var(--bg);stroke-width:2}.packet:focus{outline:none;stroke:white;stroke-width:4}#development{color:var(--muted);font-size:12px}.message-search{display:block;color:var(--muted);font-size:12px;margin-bottom:14px}.message-search input{display:block;width:100%;min-width:0;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;font:inherit;padding:8px}.agent{max-width:100%;overflow-wrap:anywhere}.agent small{display:block;margin:0}#connection,#updated,#phase,#development{overflow-wrap:anywhere}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(max-width:500px){.toolbar{gap:10px}.toolbar select{max-width:100%;width:0}.toolbar label{gap:8px}.map-heading small{width:100%}.history label{white-space:normal}.history input{width:0;min-width:0}.map-heading{gap:8px}.node text{font-size:12px}.node text.sub{font-size:10px}}
+
+/* Ownership is separate from measured command/reply routes. */
+.ownership-edge{stroke:#b5a4d4;stroke-width:1.6;stroke-dasharray:5 6;fill:none;opacity:.75;pointer-events:none}
+.map-scene .edge{opacity:.32;pointer-events:none}
+.graph-viewport{width:100%;overflow:auto;max-height:70vh;min-height:180px;overscroll-behavior:contain}
+.graph-viewport #graph{max-width:none;flex-shrink:0;margin:0 auto}
+.fleet-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:6px 12px}
+.fleet-controls button,.fleet-controls select{min-height:44px}
+.fleet-controls select{min-width:0;max-width:100%;flex:1 1 200px}
+.fleet-controls small{color:var(--muted)}
+.fleet-legend{margin:4px 12px 8px;overflow-wrap:anywhere}
+.map-focus .graph-viewport{max-height:calc(100dvh - 200px)}
+@media(max-width:500px){.fleet-controls{gap:6px}.fleet-controls button{font-size:12px;padding:7px 10px}.fleet-legend{font-size:11px}.map-focus .graph-viewport{max-height:calc(100dvh - 260px)}}
+
+.node.inactive rect{stroke-dasharray:4 3;fill:#1b1e2b}.node.inactive text{fill:var(--muted)}
+.map-focus .fleet-controls{padding:4px 12px;gap:6px}.map-focus .fleet-controls select{flex:1 1 140px}.map-focus .fleet-controls button{min-height:36px;padding:6px 10px;font-size:12px}.map-focus #fleet-scale,.map-focus .fleet-controls button:last-child{display:none}.map-focus .fleet-legend{font-size:11px;line-height:1.4;margin-top:2px}

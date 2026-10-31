@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "moderator": {"model":"gpt-6-astra","effort":"high","reason":"전체 설계 조정·통합·복합 오류 판단"},
   "roles": {
     "Planner":{"model":"gpt-6.1-sol","effort":"high","reason":"요구사항과 예외를 포함한 기획 수정"},
@@ -12,11 +12,41 @@
     "Review":{"model":"gpt-6-astra","effort":"high","reason":"독립 코드 검토와 동시성 검증"},
     "Test":{"model":"gpt-6.1-sol","effort":"high","reason":"테스트 실행·실패 분류"},
     "Worker":{"model":"gpt-6-luna","effort":"low","reason":"작고 명확한 확인·정리 작업"},
-    "Main":{"model":"gpt-6-astra","effort":"high","reason":"기본 조정 역할"}
+    "Main":{"model":"gpt-6-astra","effort":"high","reason":"기본 조정 역할"},
+    "Integrator":{"model":"gpt-6-astra","effort":"high","reason":"다중 모듈 통합·Studio 실패 원인 판단"},
+    "Profiles":{"model":"gpt-6-astra","effort":"high","reason":"영구 저장·복구·중복 저장 경계"},
+    "Economy":{"model":"gpt-6-astra","effort":"high","reason":"게임 머니·재고 원자성·도난 경계"},
+    "Delivery":{"model":"gpt-6.1-terra","effort":"medium","reason":"확정 계약의 배송 코드 구현"},
+    "PerfAudit":{"model":"gpt-6.1-sol","effort":"medium","reason":"지도 캐시·관측 정확성 개선"}
   },
   "tiers": {
     "simple":{"model":"gpt-6-luna","effort":"low"},
     "standard":{"model":"gpt-6.1-sol","effort":"medium"},
-    "complex":{"model":"gpt-6-astra","effort":"high"}
+    "complex":{"model":"gpt-6-astra","effort":"high"},
+    "inspect":{"model":"gpt-6-luna","effort":"low","reason":"범위가 정해진 파일 확인·결과 요약"},
+    "routine":{"model":"gpt-6.1-terra","effort":"low","reason":"명확한 작은 코드 수정·정해진 검사 실행"},
+    "implementation":{"model":"gpt-6.1-terra","effort":"medium","reason":"확정된 계약의 일반 코드 구현"},
+    "ui":{"model":"gpt-6.1-sol","effort":"medium","reason":"화면 구성·반응형 UI·문구의 균형"},
+    "deep-code":{"model":"gpt-6.1-terra","effort":"high","reason":"여러 코드 경로를 추적하는 비핵심 오류 수정"},
+    "design":{"model":"gpt-6.1-sol","effort":"high","reason":"기획·공유 계약·요구사항의 모순 정리"},
+    "critical":{"model":"gpt-6-astra","effort":"high","reason":"저장·경제·권한·동시성 및 독립 최종 검토"},
+    "hard-debug":{"model":"gpt-6-astra","effort":"xhigh","reason":"재현된 복합 실패의 원인 분석; 다음 독립 작업에는 재평가"}
+  },
+  "workloads": {
+    "inspection":{"tier":"inspect"},
+    "test-run":{"tier":"routine"},
+    "code":{"tier":"implementation"},
+    "interface":{"tier":"ui"},
+    "debug":{"tier":"deep-code"},
+    "planning":{"tier":"design"},
+    "review":{"tier":"critical"},
+    "integration":{"tier":"critical"}
+  },
+  "dispatchRules": {
+    "applyOnlyBeforeDispatch": true,
+    "preserveRunningTurns": true,
+    "stopOnUsageLimit": true,
+    "automaticFailureRetry": false,
+    "notes":"효율 최적화 가설이며 속도 보장은 아님. catalog 지원 모델/effort만 허용. 실제 모델은 turn_context로 별도 관측. 기존 simple/standard/complex는 실행 중 매니페스트 호환용. 새 작업은 workload와 위험으로 선택. 완료 후 다음 작업에서 재평가하며 max/ultra 상시 사용은 하지 않음."
   }
 }

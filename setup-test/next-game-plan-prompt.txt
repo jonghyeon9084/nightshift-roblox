@@ -1,0 +1,4 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수. @NightShift-Planner 의 능동 후속 기획. 사용자는 자신이한국편의점같은피드백을매번하기전에 기획→독립검토→구현→플레이검증을계속연결하도록승인했다.
+docs/implementation/warehouse-integration.md 및 commerce-integration-report.md, docs/design/store-design-review.md, game-brief/retention-plan을 실제로읽고 다음작업을 제안. docs/design/next-iteration.md만작성하며 게임소스/Studio/runner수정금지.
+구현안이아닌실제관찰된결함/빠진기본게임루프를먼저선택. 한국편의점현실감·물류동선·첫5분안내·친구역할분담·공유재고경쟁·다시방문할이유·가벼운공포의순서로 평가하되 자동결제/강제광고/유료랜덤/의도적불편/필요없는기능증가는제외. 현재확인결함없으면 실제플레이테스트시나리오를실행워커가따라할수있게준비. 임의사용자/이탈/매출수치만들지말고가설표시.
+다음한묶음은 최대3개구체적개선, 각문제근거·요구행동·완료조건·읽기/쓰기파일·담당기존워커/필요시하위역할·모델workload/위험·필요검증·의존성. 이미완성된기능재구현금지. 로컬구현과Studio검증은승인된범위, Roblox게시/실제판매/유료구매는제외. 독립DesignReview가검토할수있도록추천우선순위와보류이유를명시. Moderator확인후 [STAGE_READY:NEXT_GAME_PLAN].

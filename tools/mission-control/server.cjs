@@ -4,8 +4,11 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const crypto = require('node:crypto');
-const {Journal,readTranscript}=require('./journal.cjs');
+const {Journal}=require('./journal.cjs');
 const modelEvidence=require('./model-evidence.cjs');
+const {createLimiter,PollCache,FileHashCache,readWorkerPool,ingestPoolEvents,MessageIngestor}=require('./poll-cache.cjs');
+const limitCommand=createLimiter(3);
+const fileHashes=new FileHashCache();
 const run = promisify(execFile);
 const root = path.resolve(__dirname, '../..');
 const cli = path.join(process.env.LOCALAPPDATA, 'Programs/Maestro/resources/maestro-cli.js');
@@ -13,13 +16,15 @@ const port = 43821;
 const groupId = 'group-328267a7-c84e-4fc2-bb1d-63fbb94bd916';
 const evidence = path.join(root, '.setup/map-events.jsonl');
 fs.mkdirSync(path.dirname(evidence), { recursive: true });
-let snapshot = { ok: false, error: 'Maestro에 연결 중', agents: [], chats: [], at: null };
+let snapshot = { workerPool:{workers:[],tasks:[]}, ok: false, error: 'Maestro에 연결 중', agents: [], chats: [], at: null };
 let lastClientAt = Date.now();
 const seen = new Set();
 const journal=new Journal(path.join(root,'.setup/history'));
+const messageIngestor=new MessageIngestor(journal);
 const transcriptRoot=path.join(process.env.APPDATA,'maestro/group-chats');
 const previousState=path.join(root,'.setup/history/last-state.json');
 try { snapshot={...JSON.parse(fs.readFileSync(previousState,'utf8')),ok:false,error:'저장된 상태 · 현재 연결 확인 중'}; } catch {}
+try {snapshot.workerPool=readWorkerPool(path.join(root,'.setup/worker-pool/state.json'));}catch {snapshot.workerPool={workers:[],tasks:[]};}
 function trackFiles(directory) {
   if(!fs.existsSync(directory))return;
   for(const item of fs.readdirSync(directory,{withFileTypes:true})) {
@@ -27,41 +32,48 @@ function trackFiles(directory) {
     if(item.isDirectory()) { if(!['node_modules','.git','.setup'].includes(item.name))trackFiles(file); continue; }
     if(!item.isFile()||! /\.(md|json|luau|lua|js|cjs|html|css|ps1|txt)$/.test(item.name))continue;
     const relative=path.relative(root,file).replaceAll('\\','/');
-    const hash=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+    const hash=fileHashes.hash(file);
     journal.change('file/'+relative,hash,{kind:'file',actor:'파일 관찰',content:relative,timestamp:fs.statSync(file).mtime.toISOString(),hash});
   }
 }
-async function command(args) {
-  const { stdout } = await run(process.execPath, [cli, ...args, '--json'], { windowsHide: true, timeout: 12000, maxBuffer: 4 * 1024 * 1024 });
+async function command(args) { return limitCommand(async()=>{
+  let stdout;
+  try {({stdout}=await run(process.execPath, [cli, ...args, '--json'], { windowsHide: true, timeout: 12000, maxBuffer: 4 * 1024 * 1024 }));}
+  catch {throw Error('Maestro CLI 실행 실패 (시간 초과 또는 프로세스 오류)');}
   return JSON.parse(stdout);
-}
+});}
+const pollCache=new PollCache({sourceRoot:transcriptRoot,archiveRoot:path.join(root,'.setup/history/maestro'),command,ingest(chat,sourceLog){
+  messageIngestor.ingest(chat,sourceLog);
+}});
 async function poll() {
   try {
-    const [agents, list, sessions] = await Promise.all([command(['list','agents']), command(['group-chat','list']), command(['session','list'])]);
-    if (!list.success || !sessions.success) throw new Error('Maestro 상태 조회 실패');
+    const baseResults=await Promise.allSettled([command(['list','agents']), command(['group-chat','list']), command(['session','list'])]);
+    const failed=baseResults.find(result=>result.status==='rejected');
+    if(failed)throw failed.reason;
+    const [agents,list,sessions]=baseResults.map(result=>result.value);
+    if (!Array.isArray(agents) || !list.success || !sessions.success) throw new Error('Maestro 상태 조회 실패');
     const scoped = agents.filter(a => a.groupId === groupId);
     const names = new Set(scoped.map(a => a.name));
     const chats = [];
     const eligible = list.chats.filter(c => c.topic.startsWith('NightShift') && c.participants.some(p => names.has(p.name)));
     eligible.sort((a,b)=>Number(b.isActive)-Number(a.isActive));
-    for (const chat of eligible.slice(0, 20)) {
-      const result = await command(['group-chat','status',chat.id,'--tail','80']);
-      if (!result.success) throw new Error('그룹 대화 조회 실패');
-      chats.push(result.chat);
-      result.chat.modelInfo=modelEvidence.chatModels(chat.id);
-      const sourceDir=path.join(transcriptRoot,chat.id);
-      const sourceLog=path.join(sourceDir,'chat.log');
-      if(fs.existsSync(sourceLog)) {
-        const archive=path.join(root,'.setup/history/maestro',chat.id);
-        fs.mkdirSync(archive,{recursive:true});
-        for(const name of ['chat.log','history.jsonl','metadata.json']) {
-          const source=path.join(sourceDir,name);
-          if(fs.existsSync(source))fs.copyFileSync(source,path.join(archive,name));
-        }
-        for(const entry of readTranscript(sourceLog,result.chat))journal.add(entry);
-      } else journal.messages(result.chat);
-      journal.change('chat/'+chat.id,{state:result.chat.state,isActive:result.chat.isActive,participants:result.chat.participants.map(p=>p.name)},{kind:'status',chatId:chat.id,topic:result.chat.topic,actor:'Maestro',content:result.chat.state+(result.chat.isActive?' · 활성':' · 비활성'),timestamp:new Date().toISOString()});
-      for (const m of result.chat.messages) {
+    pollCache.prune(eligible);
+    // Wait for every refresh to settle before scheduling the next poll.
+    const results=await Promise.allSettled(eligible.map(chat=>pollCache.get(chat)));
+    const errors=[];
+    for (const [index,result] of results.entries()) {
+      if(result.status==='rejected'){
+        errors.push('그룹 '+eligible[index].id+': 상태 조회 또는 로그 보관 실패');
+        const listed=eligible[index];
+        const previous=snapshot.chats.find(c=>c.id===listed.id);
+        chats.push({...previous,id:listed.id,topic:listed.topic,state:listed.state,isActive:listed.isActive,participants:listed.participants.map(p=>({name:p.name})),messages:previous?.messages||[],stale:true,lookupFailed:true,error:'그룹 상태 조회 또는 로그 보관 실패'});
+        continue;
+      }
+      const chat=eligible[index];
+      const resultChat={...result.value,modelInfo:modelEvidence.chatModels(chat.id)};
+      chats.push(resultChat);
+      journal.change('chat/'+chat.id,{state:resultChat.state,isActive:resultChat.isActive,participants:resultChat.participants.map(p=>p.name)},{kind:'status',chatId:chat.id,topic:resultChat.topic,actor:'Maestro',content:resultChat.state+(resultChat.isActive?' · 활성':' · 비활성'),timestamp:new Date().toISOString()});
+      for (const m of resultChat.messages) {
         const key = chat.id + '/' + m.id;
         if (!seen.has(key)) {
           seen.add(key);
@@ -78,8 +90,10 @@ async function poll() {
       const manifest=JSON.parse(fs.readFileSync(path.join(root,'tools/development-pipeline.json'),'utf8'));
       development={alive,mode:development.mode,status:alive?development.status:'stopped',stage:development.stage,stageId:development.stageId,stageName:manifest.stages[development.stage]?.name,reason:development.reason,at:development.at,chatId:development.chatId,completedStages:development.completedStages?.map(s=>({id:s.id,at:s.at}))};
     }catch{}
+    const workerPool=readWorkerPool(path.join(root,'.setup/worker-pool/state.json'));
+    ingestPoolEvents(path.join(root,'.setup/worker-pool/events.jsonl'),journal);
     const configured=modelEvidence.configured();
-    snapshot = { ok: true, at: new Date().toISOString(), preferredChatId, development, agents: scoped.map(a => ({id:a.id,name:a.name,type:a.toolType,...configured.get(a.name),states:sessions.sessions.filter(s=>s.agentId===a.id).map(s=>s.state)})), chats };
+    snapshot = { ok: errors.length===0, ...(errors.length?{error:errors.join('; ')}:{}), workerPool, at: new Date().toISOString(), preferredChatId, development, agents: scoped.map(a => ({id:a.id,name:a.name,type:a.toolType,...configured.get(a.name),states:sessions.sessions.filter(s=>s.agentId===a.id).map(s=>s.state)})), chats };
     for(const log of ['runner/events.jsonl','model-routing.jsonl']) {
       const file=path.join(root,'.setup',log);if(!fs.existsSync(file))continue;
       for(const line of fs.readFileSync(file,'utf8').split('\n')) {try{const event=JSON.parse(line);journal.add({id:log+'/'+crypto.createHash('sha256').update(line).digest('hex'),kind:'status',actor:log.startsWith('runner')?'상주 실행기':'모델 배정',timestamp:event.at||event.timestamp,content:JSON.stringify(event)});}catch{}}
@@ -87,7 +101,8 @@ async function poll() {
     for(const directory of ['src','docs','tools'])trackFiles(path.join(root,directory));
     fs.writeFileSync(previousState,JSON.stringify(snapshot));
   } catch (error) {
-    snapshot = { ...snapshot, ok: false, error: error.message };
+    snapshot = { ...snapshot, ok: false, error: '지도 상태 수집 실패 · 다음 조회에서 복구 확인' };
+    try{snapshot.workerPool=readWorkerPool(path.join(root,'.setup/worker-pool/state.json'));ingestPoolEvents(path.join(root,'.setup/worker-pool/events.jsonl'),journal);}catch{}
   } finally { setTimeout(poll, Date.now()-lastClientAt>60000?15000:5000); }
 }
 const server = http.createServer((req, res) => {

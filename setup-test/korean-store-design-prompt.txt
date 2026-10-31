@@ -1,0 +1,6 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수. @NightShift-StoreDesign 는 World 소속 임시 공간기획 워커다. docs/design/korean-store-reference.md, docs/design/advertiser-content.md만 작성. 게임/world/공유/Studio/다른문서수정금지.
+사용자: 한국 편의점을 참고해 최대한 편의점다운 구조, 매장 안 LCD 광고판에서 우리가 받은 광고 표시, 트럭에도 광고 부착. 무료·자가제작 에셋만. 현재 다른 작업은 8매장 =도로, 내부 사무실 PC주문, 실제창고, 직접상품운반·진열, 트럭모델,바닥겹침수정이다. docs/implementation/commerce-contract.md, docs/implementation/advertising.md 및 docs/game-brief.md를 읽되 src는 다른통합워커소유라 수정하지 않는다.
+공식 GS25/GS리테일·CU/BGF리테일 공개 매장 소개/사진을 웹에서 참고해 링크·관찰·게임에맞춘변형을 구분. 로고/캐릭터/사진/광고물을 게임으로 무단 복제하지 말고 자가제작 배치·형태만. 미확인 레이아웃은 추정명시. 한국편의점 계산대/입구/음료냉장고/카테고리진열/전자레인지·온수·커피/작은취식공간/후방사무실·창고를 공간·시야·협동동선/광고가림없이 배치하는 구체적안. 현재56x48 점포·8매장·최소6stud 통로·기존마커·도난경보/차량경로 보존.
+광고 계획: 내부LCD(영상자동재생/소리강제없음), 거리공식AdGui광고기존10면계약확인, 트럭측면광고. Roblox 공식 immersive-ads/AdGui 문서를 열어 이동차량 광고면 적합성·fallback·콘텐츠모드 제약을 확인. 공식광고가 이동차량에서 적합하지 않거나 불명확하면 트럭은 운영자 직접협찬이미지용SurfaceGui/Decal 방식으로 명확히 분리. 같은면 AdGui+SurfaceGui중첩 금지. 아직사용자가전달한실제광고이미지없음: 허위브랜드/파트너/수익표시없고 자체안내placeholder. 무료자가제작기본소재,운영자가제공/권리확인한이미지ID allowlist로교체,기본게임콘텐츠와광고표시구분. 실제광고계약/판매/계정게시/유료구매하지않는다.
+받은광고설정의 제안스키마(슬롯id,mode,assetId,title,advertiser,기간/사용권메모 등)와 아직비어있는값을 문서화. 개인정보/광고추적수집없음. 사양늘리기보다현재트럭/창고구현에즉시적용할우선순위3~5개 제시. 기획가설·실측전내용명시.
+최종두문서에출처와실제확인/미확인 적고 Moderator확인후 [STAGE_READY:KOREAN_STORE_DESIGN].

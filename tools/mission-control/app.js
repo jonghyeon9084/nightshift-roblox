@@ -14,10 +14,13 @@ function showMessage(m,chat,route){
 }
 function showNode(chat,name){
  const info=model.modelInfo(chat,name,state.agents);
- const busy=connected&&!!chat?.isActive&&(name==='moderator'?chat.state==='moderator-thinking':model.view(chat).pending.includes(name));
- const configured=state.agents.find(a=>a.name===name);
+ const busy=!!chat?.isActive&&(name==='moderator'?chat.state==='moderator-thinking':model.view(chat).pending.includes(name));
+ const configured=model.workers(state).find(a=>a.name===name)||state.agents.find(a=>a.name===name);
+ const observed=name==='moderator'?chat?.modelInfo?.moderator:chat?.modelInfo?.participants?.[name];
+ const task=state.workerPool?.tasks?.find(t=>(t.id||t.taskId)===configured?.taskId);
+ const ownership=configured?`\n부모: ${configured.parent} (${configured.parentName||'루트'})\n${configured.parentIssue||'부모 관계는 작업 소속이며 통신 증거가 아닙니다.'}\n작업: ${configured.taskTitle||task?.title||configured.taskId||'미지정'}\n이유: ${configured.reason||'미기록'}\n실행그룹: ${configured.chatId||chat?.id||'미지정'}\n풀 상태: ${configured.status||'미등록'} · ${configured.temporary?'임시':'일반'} · ${configured.tier||'tier 미지정'}\n표시 상태: ${model.workerStatus(configured,busy,connected)}`:'';
  const m=chat&&[...(chat.messages||[])].reverse().find(m=>m.participantName===name);
- $('detail').textContent=`${chat?'그룹: '+chat.topic+' ('+chat.id+')':'등록된 일반 세션'}\n세션: ${name}\n모델: ${info.model} · 추론: ${info.effort} · ${info.source}\n관측 시각: ${info.observedAt?new Date(info.observedAt).toLocaleString('ko-KR'):'미확인'}\n${model.activityText(info,busy)}\n집계 범위: 마지막 턴 시작 이후 · 최근 도구: ${info.activity?.lastToolName||'미확인'}\n최근 이벤트: ${info.activity?.lastEventAt?new Date(info.activity.lastEventAt).toLocaleString('ko-KR'):'미확인'}${configured?.configuredModel?'\n다음 요청 설정: '+configured.configuredModel+' · '+configured.configuredEffort:''}\n\n${m?.content||'해당 세션의 응답 기록 없음'}`;
+ $('detail').textContent=`${chat?'그룹: '+chat.topic+' ('+chat.id+')':'등록된 일반 세션'}\n세션: ${name}\n관측 모델: ${observed?.model||'미확인'} · effort: ${observed?.effort||'미확인'}\n구성 모델: ${configured?.configuredModel||'미확인'} · effort: ${configured?.configuredEffort||'미확인'}${ownership}\n관측 시각: ${info.observedAt?new Date(info.observedAt).toLocaleString('ko-KR'):'미확인'}\n${model.activityText(info,busy&&connected)}\n집계 범위: 마지막 턴 시작 이후 · 최근 도구: ${info.activity?.lastToolName||'미확인'}\n최근 이벤트: ${info.activity?.lastEventAt?new Date(info.activity.lastEventAt).toLocaleString('ko-KR'):'미확인'}${configured?.configuredModel?'\n다음 요청 설정: '+configured.configuredModel+' · '+configured.configuredEffort:''}\n\n${m?.content||'해당 세션의 응답 기록 없음'}`;
 }
 function addEdge(parent,key,a,b,kind='line'){const geometry=model.connectionPath(a,b,kind),element=svg('path',{d:geometry.d,class:'edge'});parent.append(element);const edge={geometry,element};if(Array.isArray(key))for(const k of key)routePaths[k]=edge;else routePaths[key]=edge;return edge;}
 function stopPackets(){epoch++;document.querySelectorAll('.packet').forEach(e=>e.remove());}
@@ -31,7 +34,7 @@ async function drainLive(){
 }
 function visibleChats(){return (state?.chats||[]).filter(c=>!selected||c.id===selected);}
 function graph(){
- const root=$('graph'),w=Math.max(280,Math.floor(root.getBoundingClientRect().width)),compact=w<560;
+ const root=$('graph');root.style.width='100%';const w=Math.max(280,Math.floor(root.getBoundingClientRect().width)),compact=w<560;
  // Rebuild only the scene: keep the packet layer attached, including keyboard focus.
  const old=root.querySelector('.map-scene');if(old)old.remove();
  const g=svg('g',{class:'map-scene'});root.prepend(g);
@@ -41,7 +44,7 @@ function graph(){
  const addText=(x,y,text,cls)=>{const el=svg('text',{x,y,class:cls||''},text);g.append(el);fitText(el);};
  function node(chat,name,x,y,main,busy,registered=false){
   const key=model.nodeKey(registered?'registry':chat.id,name),info=model.modelInfo(chat,name,state.agents),nw=compact?130:176;
-  points[key]={x,y};const group=svg('g',{class:`node ${main?'main':''} ${busy?'busy':''}`,transform:`translate(${x},${y})`,role:'button',tabindex:0,'aria-label':`${chat?.topic||'일반 세션'} ${name} · ${info.model} · ${info.source}`});
+  points[key]={x,y};const group=svg('g',{class:`node ${main?'main':''} ${busy?'busy':''}`,transform:`translate(${x},${y})`,role:'button',tabindex:0,'aria-label':`${chat?.topic||'일반 세션'} ${name} · ${info.model} · ${info.source}`,'data-worker':name,'data-parent':model.workers(state).find(a=>a.name===name)?.parent||''});
   const title=svg('title',{},`${name} · ${info.model} · ${info.effort} · ${info.source}`);
   const label=main?'Moderator':model.label(name);
   const clip=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s;
@@ -91,7 +94,7 @@ function render(){
  $('phase').textContent=selected?'그룹 상세':'전체 맵 · '+state.chats.length+'개 그룹';
  $('stage').textContent='';
  const dev=state.development,devStatus=model.developmentStatus(dev,connected);$('development').textContent=devStatus.title+' · '+devStatus.reason;
- const sig=JSON.stringify([selected,connected,dev,$('graph').clientWidth,(state.chats||[]).map(c=>[c.id,c.topic,c.state,c.isActive,c.participants,c.modelInfo,model.view(c).pending]),state.agents]);
+ const sig=JSON.stringify([selected,connected,dev,$('graph').clientWidth,(state.chats||[]).map(c=>[c.id,c.topic,c.state,c.isActive,c.participants,c.modelInfo,model.view(c).pending]),state.agents,state.workerPool]);
  if(sig!==signature){signature=sig;graph();}
  $('messages').replaceChildren();const q=$('message-query').value.toLocaleLowerCase();
  const rows=visibleChats().flatMap(chat=>(chat.messages||[]).map(m=>({chat,m}))).sort((a,b)=>new Date(b.m.timestamp)-new Date(a.m.timestamp));
@@ -102,7 +105,7 @@ function render(){
   time.textContent=new Date(m.timestamp).toLocaleString('ko-KR');txt.textContent=(m.content||'').slice(0,160);b.append(strong,time,txt);b.onclick=()=>showMessage(m,chat);li.append(b);$('messages').append(li);
  }
  $('replay').disabled=!connected||replaying||!rows.length;
- $('agents').replaceChildren();for(const a of state.agents||[]){const el=document.createElement('div'),small=document.createElement('small');el.className='agent';el.append(document.createTextNode(a.name));const info=model.modelInfo(null,a.name,state.agents);small.textContent=`${info.short} · ${info.source} · ${(a.states||[]).join(', ')||'미확인'}`;el.append(small);$('agents').append(el);}
+ $('agents').replaceChildren();for(const a of model.workers(state)){const el=document.createElement('div'),small=document.createElement('small');el.className='agent';el.append(document.createTextNode(a.name));const info=model.modelInfo(null,a.name,state.agents);small.textContent=`${info.short} · ${info.source} · ${(a.states||[]).join(', ')||'미확인'}`;el.append(small);$('agents').append(el);}
 }
 function disconnected(reason){connected=false;replaying=false;stopPackets();$('connection').textContent='연결 끊김 · 마지막 기록 유지';$('connection').className='error';$('updated').textContent=reason;$('mode').textContent='연결 끊김 · 패킷 이동 중단';$('replay').disabled=true;render();}
 async function refresh(){

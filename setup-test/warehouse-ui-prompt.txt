@@ -1,0 +1,5 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수. @NightShift-WarehouseUI 는 UI 소속 임시 워커. src/client/ 및 docs/implementation/warehouse-ui.md만 수정. Studio/서버/공유/world/runner 수정금지.
+최신 요구는 사무실안컴퓨터에서 재고 주문, 배송트럭에서 직접운반, 실제창고보관/꺼내기/진열이다. 현재 commerce-contract와 CommerceClient/State/Main을 읽고 기존 API/Warehouse 상태/OfficePC ProximityPrompt를 재사용해 빠진 접근과 안내를 완성. 현재 거래서버와 계약 변경 없이 실제서버 DTO/확정응답에 맞춰 UI를 렌더링.
+도매 주문 조작은 자기 사무실 컴퓨터 근처에서만 열고 사용할 수 있게. 상시HUD 도매 버튼이 어디서든 구매창을 여는 동선이면 PC로가도록 안내하고 떨어지면 주문/취소 조작 비활성/닫기. 서버거절도 명확히 표시. 모바일 PC 터치 ProximityPrompt, 키보드키 안내. 단순 조회화면과 주문가능여부를 구별.
+창고재고는 상품명·수량·남은보관수량을 명확하게 보이고 직접창고접근시 보관/꺼내기→선반진열의 흐름 안내. 원격자동입고/자동진열로 사용자직접행동을 없애지 말 것. 트럭 도착/짐칸 접근/빈창고 안내. 실제 서버 ack 전에 수량 증감 확정금지. 결제압박없음. 신규리모트나 클라이언트경제권한 금지.
+현재src UI검사와 필요한거리/페이지접근/빈재고/모바일작은화면상태 테스트 수행. 읽기쉬운한국어 문구. 변경파일·실제검증·Studio미검증 docs보고 후 Moderator확인 [STAGE_READY:WAREHOUSE_UI].

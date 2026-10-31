@@ -4,6 +4,7 @@ const path = require('node:path');
 const http = require('node:http');
 const { PipelineRunner } = require('./pipeline.cjs');
 const { createStore, createFiles, createAdapter, within } = require('./io.cjs');
+const { WorkerPool } = require('./pool.cjs');
 const DEFAULT_PORT = 43823;
 function acquireSingleton(port, listener = (_req, res) => res.end()) {
   return new Promise((resolve, reject) => {
@@ -17,12 +18,12 @@ async function main(options = {}) {
   const manifestFile = options.manifestFile || path.join(root, 'tools/development-pipeline.json');
   const port = options.port ?? DEFAULT_PORT;
   const directory = path.join(root, '.setup/runner');
-  let runner, timer, watcher, debounce, stopping = false;
+  let runner, pool, timer, watcher, debounce, stopping = false, ticking = false;
   const server = await acquireSingleton(port, (req, res) => {
     if (![ `127.0.0.1:${port}`, `localhost:${port}` ].includes(req.headers.host) || req.headers.origin) { res.writeHead(403); return res.end(); }
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
-    if (req.method === 'GET' && req.url === '/health') return res.end(JSON.stringify({ service: 'nightshift-resident-runner', pid: process.pid, root, entry: __filename, state: runner?.state || null }));
+    if (req.method === 'GET' && req.url === '/health') return res.end(JSON.stringify({ service: 'nightshift-resident-runner', pid: process.pid, root, entry: __filename, state: runner?.state || null, workerPool:pool?.snapshot||null }));
     if (req.method === 'POST' && req.url === '/stop' && req.headers['x-runner-pid'] === String(process.pid)) { res.end(JSON.stringify({ stopping: true, pid: process.pid })); void stop(); return; }
     res.writeHead(404); res.end('{}');
   });
@@ -30,11 +31,13 @@ async function main(options = {}) {
     if (stopping) return;
     stopping = true;
     runner?.requestStop();
+    pool?.requestStop();
     clearTimeout(timer); clearTimeout(debounce); watcher?.close();
     // Finish an already issued CLI call; never stop its moderator/participants.
-    while (runner?.locked) await new Promise(resolve => setTimeout(resolve, 100));
+    while (ticking || runner?.locked) await new Promise(resolve => setTimeout(resolve, 100));
     try {
       runner?.stop();
+      pool?.stop();
       try { fs.unlinkSync(path.join(directory, 'runner.pid')); } catch (e) { if (e.code !== 'ENOENT') console.error(e.message); }
     } catch (error) { console.error(`Stop checkpoint could not be saved: ${error.message}`); }
     finally { server.close(); }
@@ -48,19 +51,21 @@ async function main(options = {}) {
     }
     // Context only: never rewrite the previous automation's status or invoke it.
     try { JSON.parse(fs.readFileSync(path.join(root, 'docs/automation-state.json'), 'utf8').replace(/^\uFEFF/, '')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
-    runner = new PipelineRunner({ manifest, store: createStore(directory), files: createFiles(root, directory), adapter: createAdapter(root) });
-    if (options.resume) runner.resume();
+    const adapter=createAdapter(root);
+    if(fs.existsSync(path.join(root,'tools/worker-pool.json'))){pool=new WorkerPool({root,adapter});pool.refresh();}
+    runner = new PipelineRunner({ manifest, store: createStore(directory), files: createFiles(root, directory), adapter: {...adapter,capacityLimit:()=>pool?.config.maxWorkers??4,canDispatch:(stage,chats,chatId)=>pool?.pipelineGuard(stage,chats,chatId)} });
+    if (options.resume) { runner.resume();pool?.resume(); }
     runner.save();
     fs.writeFileSync(path.join(directory, 'runner.pid'), String(process.pid));
     runner.event('resident-started', { port, manifestFile });
-    let ticking = false, pending = false;
+    let pending = false;
     async function tick() {
       if (stopping) return;
       if (ticking) { pending = true; return; }
       ticking = true;
       clearTimeout(timer);
-      try { await runner.tick(); }
-      catch (e) { console.error(e.message); }
+      try { await pool?.observe();await runner.tick({allowDispatch:false});if(!runner.state.checkpoint&&!['attention','awaiting-review'].includes(runner.state.status)&&!pool?.hasFatal()&&!runner.state.halt)await runner.tick();await pool?.dispatchReady(runner.state); }
+      catch (e) { console.error(e.message);if(pool){pool.error=e.message;pool.event('pool-error',{reason:e.message});} }
       finally {
         ticking = false;
         if (!stopping) {

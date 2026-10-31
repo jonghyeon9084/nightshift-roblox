@@ -1,0 +1,2 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수. @NightShift-DesignReview 독립공간/광고기획검토. docs/design/korean-store-reference.md, advertiser-content.md와 commerce-contract, advertising 제약을 읽고 docs/design/store-design-review.md만 작성. 실제기획자는 StoreDesign이므로 자기검토아님.
+한국편의점형배치가 협동게임동선/진열/후방창고/사무실PC/배송차량/도난경보와 충돌하는지, LCD·트럭광고가 자연스럽고 권리확인된소재만수용하는지, 공짜기본루프/미성년광고정책·기본안내fallback·공식AdGui와직접광고 구분을 검토. 필요한현재정책은 Roblox공식문서에서확인. 지적마다 근거·수정대안·실제확인테스트. 재미/전환/수익향상은실측전가설. 공간모델이나Studio/판매게시/계정조작금지. 우선3개문제와수용가능한구체적안을명확히 적고 Moderator확인 [STAGE_READY:STORE_DESIGN_REVIEW].

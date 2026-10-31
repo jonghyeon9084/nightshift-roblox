@@ -13,7 +13,12 @@ function within(root, relative) {
 function atomicJson(file, value) {
   const temporary = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(temporary, JSON.stringify(value, null, 2) + '\n', { encoding: 'utf8', mode: 0o600 });
-  fs.renameSync(temporary, file);
+  // Windows may transiently deny replace while an observer/antivirus holds the file.
+  // Bounded local IO retries only; this never repeats an AI dispatch.
+  for(let attempt=0;;attempt++){
+    try{fs.renameSync(temporary,file);break;}
+    catch(error){if(!['EPERM','EACCES','EBUSY'].includes(error.code)||attempt>=4)throw error;Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10*2**attempt);}
+  }
 }
 function createStore(directory) {
   fs.mkdirSync(directory, { recursive: true });
@@ -77,6 +82,14 @@ function createAdapter(root, { cli = path.join(process.env.LOCALAPPDATA, 'Progra
     return result;
   }
   return {
+    async ensureWorker(task) {
+      const {stdout}=await run(process.execPath,[cli,'list','agents','--json'],{cwd:root,windowsHide:true,timeout:20000});
+      const agents=JSON.parse(stdout);if(agents.some(a=>a.name===task.worker))return;
+      const settings=await run(process.execPath,[cli,'settings','agent','get','codex','customPath','--json'],{cwd:root,windowsHide:true,timeout:20000});
+      const setting=JSON.parse(settings.stdout);
+      if(!setting.value||!fs.existsSync(setting.value))throw Error('Configured subscription Codex executable unavailable');
+      await command(['create-agent',task.worker,'--cwd',root,'--type','codex','--group','group-328267a7-c84e-4fc2-bb1d-63fbb94bd916','--custom-path',setting.value,'--nudge',`프로젝트 ${root}. AGENTS.md 준수. 담당 파일 ${task.writes.join(', ')}. ${task.title}. 메인 배정 이외 작업/Studio 조작/외부 API 호출/유료 구매 금지. 완료 후 비활성 대기. 필요 시 하위 작업 목적/파일/완료 조건을 메인에 보고.`,'--background']);
+    },
     async list() { return (await command(['group-chat', 'list'])).chats; },
     async status(id) {
       const chat = (await command(['group-chat', 'status', id, '--tail', '200'])).chat;
@@ -92,7 +105,7 @@ function createAdapter(root, { cli = path.join(process.env.LOCALAPPDATA, 'Progra
     problem(chat, fresh) {
       if (chat.state === 'error' || chat.error) return `Maestro error: ${chat.error || chat.state}`;
       const issue = fresh.find(m => m.eventType === 'error' || /(?:you(?:'ve| have) (?:hit|reached).*usage limit|usage limit reached|rate limit exceeded|not logged in|authentication (?:failed|required)|사용\s*한도(?:에|를)?\s*(?:도달|초과)|인증\s*(?:실패|필요)|로그인이 필요)/i.test(m.content));
-      return issue ? `Limit/authentication/error observed in ${issue.participantName}: stop and review Maestro` : null;
+      return issue ? `${/usage.?limit|rate.?limit|authentication|not logged in|사용\s*한도|인증\s*(?:실패|필요)/i.test(issue.content)?'Usage/authentication limit':'Maestro event error'} observed in ${issue.participantName}: stop and review Maestro` : null;
     }
   };
 }
