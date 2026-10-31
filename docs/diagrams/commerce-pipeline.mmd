@@ -1,0 +1,19 @@
+flowchart TD
+    Contract["1. 확장 계약·재방문 기획<br/>Integrator + Planner"]
+    Profiles["Profiles<br/>개인 정보 저장·복원"]
+    Economy["Economy<br/>재고·주문·성장"]
+    Delivery["Delivery<br/>배송·운반·도난"]
+    World["World<br/>8매장 거리"]
+    App["3. 게임 연결·화면<br/>Server + UI 병렬"]
+    Review["4. 독립 코드 검토<br/>Review"]
+    Integration["5. 수정·통합·Studio 플레이<br/>Integrator 단독 쓰기"]
+    Done["등록 단계 종료<br/>awaiting-review · 결과 검토"]
+    subgraph Foundations["2. 서로 다른 파일 영역 · 최대 4명 병렬"]
+        Profiles
+        Economy
+        Delivery
+        World
+    end
+    Contract --> Profiles & Economy & Delivery & World
+    Profiles & Economy & Delivery & World --> App
+    App --> Review --> Integration --> Done

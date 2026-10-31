@@ -6,6 +6,13 @@ const crypto=require('node:crypto');
 const root=path.resolve(__dirname,'../..');
 const configPath=path.join(root,'.setup/mobile-access.json');
 function equal(a,b) { const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&crypto.timingSafeEqual(x,y); }
+function publicFrameHeaders(headers, publicAccess) {
+  const result={...headers};
+  if(publicAccess && typeof result['content-security-policy']==='string') {
+    result['content-security-policy']=result['content-security-policy'].replace(/frame-ancestors\s+'none'/, 'frame-ancestors https://jonghyeon9084.github.io');
+  }
+  return result;
+}
 function createGateway(token,{publicAccess=false}={}) {
   if(!/^[a-f0-9]{64}$/.test(token))throw new Error('A random 256-bit access key is required');
   return http.createServer((req,res)=>{
@@ -23,7 +30,7 @@ function createGateway(token,{publicAccess=false}={}) {
     if(!publicAccess&&!equal(cookie,token)) {res.writeHead(401,{'Content-Type':'text/plain; charset=utf-8'});return res.end('전용 접속 링크로 열어 주세요. NightShift 모바일 지도');}
     if(!['/','/app.js','/model.js','/fleet.js','/style.css','/api/state','/api/history','/api/history/export'].includes(url.pathname)){res.writeHead(404);return res.end();}
     const upstream=http.get({host:'127.0.0.1',port:43821,path:url.pathname+url.search,headers:{Host:'127.0.0.1:43821'},timeout:15000},response=>{
-      res.writeHead(response.statusCode,response.headers);response.pipe(res);
+      res.writeHead(response.statusCode,publicFrameHeaders(response.headers,publicAccess));response.pipe(res);
     });
     upstream.on('timeout',()=>upstream.destroy());
     upstream.on('error',()=>{if(!res.headersSent)res.writeHead(503,{'Content-Type':'text/plain; charset=utf-8'});res.end('PC 지도 서버에 연결할 수 없습니다.');});
@@ -37,4 +44,4 @@ if(require.main===module) {
   server.listen(43822,'127.0.0.1',()=>{fs.writeFileSync(path.join(root,'.setup/mobile-gateway.pid'),String(process.pid));console.log('NightShift read-only mobile gateway ready');});
   server.on('error',error=>{console.error(error.message);process.exit(1);});
 }
-module.exports={createGateway};
+module.exports={createGateway,publicFrameHeaders};

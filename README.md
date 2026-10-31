@@ -2,6 +2,8 @@
 
 친구와 함께 운영하는, 조금 이상한 야간 편의점 Roblox 게임입니다. 게임 소스와 맵 생성기, 검사, Maestro 기반 개발 도구를 공개합니다. Roblox 게임 게시와 실제 상품 판매는 아직 하지 않았습니다.
 
+**[모바일·PC 실시간 개발 지도 열기](https://jonghyeon9084.github.io/nightshift-roblox/)** — 고정 주소, 공개·읽기 전용. 개발 PC가 실행 중일 때 실제 워커와 통신 이력을 볼 수 있습니다.
+
 ## 오케스트레이터 전체 구조
 
 **메인이 목표와 작업 범위를 정하고, Maestro의 단계별 Moderator가 전문 워커에게 작업을 나눕니다.** 상주 실행기는 완료 증거를 확인해 다음 등록 작업을 시작하고, 활동 지도는 실제 지시·응답과 진행 이력을 보여 줍니다.
@@ -22,27 +24,9 @@
 
 ### 작업 하나가 진행되는 흐름
 
-```mermaid
-sequenceDiagram
-    participant Main as 메인 Codex
-    participant Runner as 상주 실행기
-    participant Mod as 단계별 Moderator
-    participant Worker as 전문 워커
-    participant Map as 활동 지도·이력
-    Main->>Runner: 단계·참가자·담당 파일·완료 조건 등록
-    Runner->>Runner: 정원·체크포인트 확인, 모델·추론 등급 적용
-    Runner->>Mod: Maestro 그룹 시작, 단계 프롬프트 전달
-    Mod->>Worker: 담당 범위·계약·완료 조건으로 위임
-    Worker-->>Mod: 변경 파일·확인 결과·미검증 사항 보고
-    Mod->>Worker: 필요한 수정·재검증 요청
-    Worker-->>Mod: 수정 결과 보고
-    Mod-->>Runner: 최종 완료 표식
-    Runner->>Runner: 마지막 응답 + 그룹 idle + 필수 파일 확인
-    Runner->>Mod: 다음 등록 단계 시작
-    Note over Runner,Map: 지도는 실제 그룹 기록·실행기 이벤트를 별도로 읽어 표시
-    Mod-->>Map: 관찰된 지시·응답
-    Runner-->>Map: 단계 전환·진행 상태
-```
+![단계 등록, 모델 배정, 워커 위임과 수정, 완료 증거 확인을 거쳐 다음 단계로 진행하는 흐름. 활동 지도는 기록을 별도로 관찰한다.](docs/diagrams/task-flow.svg)
+
+[흐름 그림 확대](docs/diagrams/task-flow.svg) · [Mermaid 원문](docs/diagrams/task-flow.mmd)
 
 독립적인 파일 작업은 병렬로 수행합니다. 워커끼리 공유 계약·산출물을 사용하고, 수정 요청과 결과 취합은 단계별 Moderator가 조정합니다. Studio 편집과 플레이 시작·종료는 해당 통합 단계의 **Integrator 한 명**에게 맡깁니다.
 
@@ -50,27 +34,9 @@ sequenceDiagram
 
 첫 버전의 **설계·독립 검토 → 공유 계약 → 맵·서버·UI 구현 → 코드 검토 → Studio 통합** 5단계 다음에 아래 확장 5단계가 연결되어 있습니다. 이 그림은 실행 순서이며 완료율 표시는 아닙니다.
 
-```mermaid
-flowchart TD
-    Contract["1. 확장 계약·재방문 기획<br/>Integrator + Planner"]
-    Profiles["Profiles<br/>개인 정보 저장·복원"]
-    Economy["Economy<br/>재고·주문·성장"]
-    Delivery["Delivery<br/>배송·운반·도난"]
-    World["World<br/>8매장 거리"]
-    App["3. 게임 연결·화면<br/>Server + UI 병렬"]
-    Review["4. 독립 코드 검토<br/>Review"]
-    Integration["5. 수정·통합·Studio 플레이<br/>Integrator 단독 쓰기"]
-    Done["등록 단계 종료<br/>awaiting-review · 결과 검토"]
-    subgraph Foundations["2. 서로 다른 파일 영역 · 최대 4명 병렬"]
-        Profiles
-        Economy
-        Delivery
-        World
-    end
-    Contract --> Profiles & Economy & Delivery & World
-    Profiles & Economy & Delivery & World --> App
-    App --> Review --> Integration --> Done
-```
+![확장 계약 이후 Profiles·Economy·Delivery·World가 병렬 구현하고, 게임 연결과 화면, 독립 검토, Studio 통합을 거쳐 결과 검토 대기로 이어지는 5단계](docs/diagrams/commerce-pipeline.svg)
+
+[개발 순서 그림 확대](docs/diagrams/commerce-pipeline.svg) · [Mermaid 원문](docs/diagrams/commerce-pipeline.mmd)
 
 실행 기준은 [development-pipeline.json](tools/development-pipeline.json)과 각 단계의 `setup-test/` 프롬프트입니다. **등록 워커 수 13개와 동시 참가자 정원 4명은 다른 값**입니다. 실행기가 새 단계를 발행하기 전에 다른 활성 그룹의 참가자까지 합산하며, 자리가 부족하면 `waiting-capacity`에서 기다립니다. Moderator와 이 채팅의 내장 하위 에이전트는 이 정원에 포함하지 않으며 수동 실행까지 모두 제한하는 전역 프로세스 제한도 아닙니다.
 
@@ -98,7 +64,7 @@ flowchart TD
 | `.setup/model-routing.jsonl` | 모델·추론 수준 배정 변경 |
 | 지도 도구 활동 표시 | 관찰 가능한 도구 이름·호출 수·최근 시각; 내부 추론·인수·출력 전문 제외 |
 
-로컬 지도는 `http://127.0.0.1:43821`이며 모바일 HTTPS 주소는 로컬 `.setup/mobile-link.txt`에서 확인합니다. 현재 외부 지도는 **공개·읽기 전용**입니다. PC·Maestro·지도 서버·터널이 켜져 있어야 실시간 조회가 됩니다. 실행 기록과 계정 정보는 Git에서 제외하며, 공개 저장소에는 소스·문서·검사 자료를 올립니다. 자세한 연결 범위는 [모바일 개발 상황실](docs/mobile-monitoring.md)을 참고하세요.
+로컬 지도는 `http://127.0.0.1:43821`, 고정 모바일 주소는 [GitHub Pages 상황실](https://jonghyeon9084.github.io/nightshift-roblox/)입니다. Pages 화면이 현재 터널의 지도를 포함해 보여 주며, 시작 스크립트가 터널 주소 변경을 별도 배포 브랜치에 갱신합니다. 현재 외부 지도는 **공개·읽기 전용**입니다. PC·Maestro·지도 서버·터널이 켜져 있어야 실시간 조회가 됩니다. 실행 기록과 계정 정보는 Git에서 제외하며, 공개 저장소에는 소스·문서·검사 자료를 올립니다. 자세한 연결 범위는 [모바일 개발 상황실](docs/mobile-monitoring.md)을 참고하세요.
 
 ## 현재 구현과 검증
 

@@ -3,11 +3,11 @@
 2026-10-31: 접근 키 없는 외부 HTTPS 루트 주소에서 실제 Maestro 상태와 이력 조회를 확인했다. 현재 설정은 **공개·무키·읽기 전용**이다.
 
 - 로컬 지도: [이 PC의 개발 상황실](http://127.0.0.1:43821/).
-- 모바일 링크: 로컬 `.setup/mobile-link.txt`의 HTTPS 루트 주소. 현재 링크에 접근 키가 없으며 로그인이나 쿠키 없이 누구나 공개 지시·응답과 이력을 읽을 수 있다. 예전의 비공개 키 링크·401·인증 쿠키 설명은 현재 운영 방식에 해당하지 않는다.
-- 외부 연결은 공식 Cloudflare Quick Tunnel. GitHub Pages 배포가 아니다. 정적 Pages만으로 PC 상태를 실시간 제공할 수 없어 현재 동작하는 서버에 HTTPS 연결을 붙였다.
+- 고정 모바일 링크: [GitHub Pages 상황실](https://jonghyeon9084.github.io/nightshift-roblox/). Pages의 고정 화면 안에서 현재 Cloudflare Quick Tunnel 지도를 표시한다. 로그인이나 쿠키 없이 누구나 공개 지시·응답과 이력을 읽을 수 있다.
+- 실제 PC 연결은 Cloudflare Quick Tunnel이다. Pages는 접속 화면과 최신 연결 주소만 호스팅하며 AI 실행이나 로그 저장을 담당하지 않는다. 직접 연결 주소는 로컬 `.setup/mobile-link.txt`, 고정 주소는 `.setup/mobile-stable-link.txt`에 있다.
 - 게이트웨이는 별도 loopback 포트 43822에서 실행되며 `publicAccess=true`다. 허용된 화면·상태·이력 GET 경로만 제공하고 그 외 경로는 404, GET 이외는 405다. Maestro 제어 API·러너 정지 API·임의 파일 경로는 외부에 제공하지 않는다.
 - 사용 중인 PC, 지도 서버, Maestro와 터널이 실행되어 있어야 최신 상태가 보인다. PC 종료·절전·네트워크 중단 중에는 모바일 접속도 끊긴다.
-- 임시 주소는 터널 재생성 시 바뀔 수 있고 가용성 보장이 없다. 고정 주소·PC 종료 후 클라우드 기록 조회는 미구현이다.
+- 터널 재생성 시 내부 연결 주소는 바뀔 수 있지만 모바일 즐겨찾기 주소는 유지된다. `Start-NightShiftMobile.ps1`이 공개 터널 주소를 `codex/mobile-monitor` 배포 브랜치에 갱신한다. Pages 배포·캐시 갱신에는 시간이 걸릴 수 있으며 화면은 60초마다 주소 변경을 확인한다. PC 종료 후 클라우드 기록 조회는 미구현이다.
 - 지도 화면은 2초마다 조회한다. 서버의 Maestro 조회는 조회 완료 후 5초, 화면을 60초 이상 보지 않으면 15초 간격이다. 실제 반영 시간에는 CLI 조회 시간도 포함된다. AI 요청은 발생하지 않는다.
 
 ## 전체 워커 지도
@@ -39,6 +39,8 @@
 - 모든 단계가 끝나면 `awaiting-review`, `completed=false`로 남는다. 메인이 실제 통합·테스트 증거와 미검증 사항을 검토해야 한다. 로컬 1~2클라이언트 검사와 실제 16인·4점포 부하 검증은 별개이며, `MaxPlayers=16` 설정 자체를 통과로 표시하지 않는다.
 
 ## 운영
+- 고정 주소 배포 설정: GitHub Pages → Deploy from a branch → `codex/mobile-monitor` → `/ (root)`. `tools/mobile-site/`의 화면 소스와 `tools/publish-mobile-site.cjs`를 사용한다. 생성 전용 체크아웃은 `.setup/mobile-site-publisher/`이며 게임 개발 체크아웃·main 브랜치를 변경하지 않는다.
+- 로컬 `.setup/mobile-pages-enabled`가 있을 때 시작 스크립트의 자동 주소 갱신이 활성화된다. 기존 Git 로그인만 사용하며 새 API 키를 생성하지 않는다. 갱신 실패는 경고로 남기고 현재 직접 링크와 로컬 개발은 유지한다.
 - `tools/Start-NightShiftMobile.ps1`: 기존 연결이 있으면 재사용하고 없으면 숨김 프로세스로 게이트웨이·터널 실행.
 - `tools/Stop-NightShiftMobile.ps1`: 이 프로젝트 소유의 게이트웨이·터널만 종료. 로컬 지도·Maestro·Studio 유지.
 - `tools/Start-NightShiftRunner.ps1`: 숨김 상주 러너 실행, singleton 확인. `tools/Stop-NightShiftRunner.ps1`은 정확한 프로세스를 검증한 뒤 정상 종료하며 Maestro와 진행 중 작업은 유지한다. 원인 해결 후 attention 상태를 재개할 때만 정지 후 `Start-NightShiftRunner.ps1 -Resume`을 사용한다.

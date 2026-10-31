@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant Main as 메인 Codex
+    participant Runner as 상주 실행기
+    participant Mod as 단계별 Moderator
+    participant Worker as 전문 워커
+    participant Map as 활동 지도·이력
+    Main->>Runner: 단계·참가자·담당 파일·완료 조건 등록
+    Runner->>Runner: 정원·체크포인트 확인, 모델·추론 등급 적용
+    Runner->>Mod: Maestro 그룹 시작, 단계 프롬프트 전달
+    Mod->>Worker: 담당 범위·계약·완료 조건으로 위임
+    Worker-->>Mod: 변경 파일·확인 결과·미검증 사항 보고
+    Mod->>Worker: 필요한 수정·재검증 요청
+    Worker-->>Mod: 수정 결과 보고
+    Mod-->>Runner: 최종 완료 표식
+    Runner->>Runner: 마지막 응답 + 그룹 idle + 필수 파일 확인
+    Runner->>Mod: 다음 등록 단계 시작
+    Note over Runner,Map: 지도는 실제 그룹 기록·실행기 이벤트를 별도로 읽어 표시
+    Mod-->>Map: 관찰된 지시·응답
+    Runner-->>Map: 단계 전환·진행 상태
