@@ -14,7 +14,9 @@ NightShift-Integrator만 Studio 쓰기를 수행한다. 실행 기록과 범위�
 
 `studio.cjs`는 기존 `tools/studio-mcp.cjs`의 공식 클라이언트를 재사용한다. 일반 LocalAppData의 `mcp.bat`가 없을 때만 `NIGHTSHIFT_STUDIO_MCP`의 설치된 공식 `StudioMCP.exe`를 실행하도록 프로세스 시작 부분을 메모리에서 바꾼다. 기존 파일·프로토콜은 변경하지 않는다. `Invoke-Studio.ps1`의 버전 경로는 이번 PC에서 확인한 경로이며 Studio 업데이트 후 없으면 설치된 공식 경로를 다시 확인해야 한다. 외부 서버/API를 대체 사용하지 않는다.
 
-로더는 `.setup/integration/install.luau`와 소스 해시·타입·경로 manifest를 생성한다. Edit에서만 실행되며 소유권·중복 이름·타입 충돌을 변경 전에 검사한다. Lua 11개를 실제 서비스에 설치하고 변경 없는 소스는 유지한다. 변경된 ModuleScript는 require 캐시가 남지 않게 교체한다. 월드 변경은 분리된 모델에서 먼저 생성한 뒤 소유한 `Workspace.NightShiftWorld`만 교체한다. 기존 Baseplate·SpawnLocation·비소유 콘텐츠를 삭제하지 않는다. 충돌은 수동 검토 대상으로 중단한다.
+로더는 `.setup/integration/install.luau`와 소스 해시·타입·경로 manifest를 생성한다. Edit에서만 실행되며 소유권·중복 이름·타입 충돌을 변경 전에 검사한다. Config·CommerceConfig·BuildWorld·BuildBillboards·서버/클라이언트 진입점과 각 Modules의 소스를 설치하고 변경 없는 소스는 유지한다. 정확한 설치 개수는 생성한 manifest를 따른다. 변경된 ModuleScript는 require 캐시가 남지 않게 교체한다. 분리된 모델에 8매장 월드와 거리·실내 광고판을 만든 뒤 전체 예산을 검증하고, `replaceInEdit`로 소유한 `Workspace.NightShiftWorld`만 교체한다. 기존 Baseplate·SpawnLocation·비소유 콘텐츠를 삭제하지 않는다. 광고판 생성 실패는 Edit 설치 오류로 보고하며 원래 월드를 교체하지 않는다. 결과의 AdUnits는 설치된 광고 면 수이며 실제 광고 노출·수익 수치가 아니다.
+
+8매장·광고판 확장 경로는 현재 통합 대상이다. 아래 1인 플레이 재현은 이전 4점포 버전에서 확인한 절차이며, 확장된 서버·화면과의 실제 검증은 `commerce_integration` 단계에서 별도 기록한다. 광고판 명세는 [advertising.md](../../docs/implementation/advertising.md)를 따른다.
 
 ## 실제 플레이
 

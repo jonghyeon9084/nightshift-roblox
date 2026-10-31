@@ -1,43 +1,52 @@
-# 월드 구현 인계
+﻿# 8매장 상거래 월드 인계
 
-`BuildWorld.luau`를 `ServerStorage.NightShift.BuildWorld` ModuleScript로 배치한다. 서버 Main이 Config를 먼저 로드한 후 `require(...BuildWorld).build(workspace)`를 한 번 호출한다. require 시 Instance 생성은 없다. `build(parent: Instance): Model`은 대기 호출 없이 완성된 모델을 마지막에 parent에 붙인다. Config 원본은 `ReplicatedStorage.NightShift.Shared.Config`이며 공유 파일은 수정하지 않았다.
+`BuildWorld.luau`를 `ServerStorage.NightShift.BuildWorld` ModuleScript로 설치한다. `ReplicatedStorage.NightShift.Shared`의 `Config`, `CommerceConfig`를 통합자가 먼저 로드해야 한다. 생성기는 원본을 변경하지 않고 기존 Config의 월드 배치·Hub·Capacity·Budget에 CommerceConfig 값을 합성한다. 공유 파일과 서버·로더는 수정하지 않았다.
 
-반환 구조:
+`build(parent): Model`은 yield 없이 완성·검증한 모델을 마지막에 parent에 붙인다. require 자체는 생성하지 않는다. 소유 루트의 `CommerceLayoutVersion=2`를 확인하여 재사용하고 구버전은 `COMMERCE_LAYOUT_MISMATCH` 오류로 거부한다. `validate(candidate)`는 신규 모델의 점포 수, 중복/누락 마커, 좌표·크기·속성·슬롯·경로·알람 초기 상태와 Part/Light 예산을 검사한다. 개별 기존 점포의 Unavailable 처리는 서버 담당이다.
 
 ```text
-NightShiftWorld [Model, NightShiftOwned=true]
-  Hub [Model]
-    Spawn [SpawnLocation]
-    StoreSelect [Part]
-    Plaza / Directory / 벤치
+NightShiftWorld [Model, NightShiftOwned=true, CommerceLayoutVersion=2]
+  Hub [Model: Spawn, StoreSelect, Plaza, Directory]
   Stores [Folder]
-    Store01 .. Store04 [Model, StoreId/DisplayName attributes]
-      Counter / Shelf1 / Shelf2 / Shelf3 / SignalPanel / Breaker / Entry [Part]
-      Spawn [SpawnLocation]
-      Architecture [Folder: 건물, 창고, 메모, 안내문]
-      Lights [Folder: Fixture1..3 Part > WorkLight PointLight]
-  Streets [Model]
-    Street1 .. Street4 [Model: 도로, 인도, 방향판, 가로등, 골목, 벤치]
+    Store01 .. Store08 [Model, StoreId/DisplayName]
+      Counter, Shelf1..3, SignalPanel, Breaker, Entry, Spawn
+      OfficePC, WarehouseDrop, Unload, TruckDock, Alarm, TheftReturn
+      ShelfSlots [Folder: Slot01..Slot12, Capacity=4]
+      TruckRoute [Folder: Approach, Dock, Exit; Order=1..3]
+      Architecture [Folder: 입구·후문·열린 선반·PC 책상·창고·하역장·옆길]
+      Lights [Folder: Fixture1..3 > WorkLight]
+  Streets [Model: MainRoad, Sidewalk, ServiceLane, HubWalk, 가로등]
+  CommerceRuntime [Folder: 비어 있음; 서버가 Trucks/Items 생성]
 ```
 
-필수 마커는 Config의 이름·로컬 좌표·크기에서 생성한다. 점포 모델 pivot도 Config 좌표/회전과 일치한다. 모델과 모든 필수 마커의 StoreId는 문자열 Attribute다. Hub는 StoreId가 없다. 모든 마커의 Anchored/CanTouch/CastShadow, Entry의 투명·비충돌, Spawn의 Neutral/Enabled/Duration 설정은 계약을 따른다. 기존 루트가 있으면 소유권과 루트/Hub 필수 구조를 검사하여 재사용하고, 충돌 시 덮어쓰지 않는다. 개별 점포 오류의 Unavailable 처리는 서버 담당이다.
+도로는 X축 400×24, 점포는 x=-120/-40/40/120, z=-52/+52로 4+4 배치한다. 남쪽 점포 yaw=180으로 로컬 +Z 입구가 도로를 향한다. Hub는 (-190,0,52)에 위치한다. 앞 인도는 폭10, 양옆길은 폭8, 후문은 폭10·높이13, 뒤 보행로는 폭8, 서비스 차로는 폭12다. 기본 마커 타입·크기·로컬 좌표는 기존 Config와 같다. Shelf1..3은 투명·비충돌 논리 마커로 바꾸고, 별도 열린 선반 판을 제작하여 하단 진열 슬롯이 기존 단단한 덩어리 안에 묻히지 않게 했다. 서버가 기존 Shelf 마커 자체를 상품 시각물로 사용하지 않도록 통합 시 확인해야 한다.
 
-네 입구는 Hub를 향하고 폭 14·높이 13 studs가 항상 열려 있다. 점포 내부는 56×48, 광장은 64×64, 각 도로는 폭 18×길이 84다. 양쪽 인도와 진입 마당이 이어지고 각 거리의 휴식 골목에 벤치가 있다. 창고 문은 로컬 x=20..28, z=-12의 폭 8이며 차단기는 그 안에 있다. 번호·이름·도형·색·차양 깊이로 점포를 구분한다. 상품 진열/트레이 내용과 ProximityPrompt는 만들지 않는다. 서버/UI가 해당 상태와 상호작용을 소유한다.
+추가 마커·슬롯·트럭 경로는 CommerceConfig의 좌표와 크기를 사용한다. 모든 논리 마커는 Anchored, 비충돌·CanTouch=false·CanQuery=false·CastShadow=false다. OfficePC와 Alarm만 보이며 다른 신규 마커는 투명하다. Alarm의 PointLight는 Enabled=false이고 OutageControlled 속성이 없다. 정전 제어는 `Lights`의 OutageControlled=true 광원만 수집하도록 서버 어댑터에서 구분해야 한다. 상품·트럭·Prompt·Remote·스크립트·SoundId·외부 에셋은 생성하지 않는다.
 
-점포별 정전 제어는 `Stores[StoreId].Lights` 아래 Light의 Enabled를 변경한다. Fixture와 Light에 StoreId 및 OutageControlled=true를 붙였다. 서버 WorldAdapter가 점포 모델 하위 Light만 수집하는 기존 방식과 맞는다. 가로등은 Streets에 있으므로 점포 정전과 분리된다. 조명 껍데기의 Neon은 길 찾기를 위해 남으며 실제 동적 광원만 꺼진다. 정답 도형은 장식에 넣지 않는다. 전역 Lighting·시간·스트리밍 설정은 변경하지 않았다. 실제 야간 시간/조도와 정전의 시각적 구분은 Studio 통합에서 확인해야 한다.
+## 배치 교체 경로 — 통합자 전용, 이번 작업에서는 미실행
 
-소스 할당 수식으로 산정한 예상 규모는 점포당 BasePart 33·PointLight 3, 공통 BasePart 88·PointLight 8, 전체 BasePart 220·PointLight 20이다. SurfaceGui 30 + TextLabel 30이다. 이는 엔진 생성 후 실측값이 아니다. 모든 Part는 Anchored=true/CastShadow=false, 모든 Light는 Shadows=false다. 빌드 시 자체 census가 점포/공통/전체 Part·Light 예산을 검사하고 BuildPartCount/BuildLightCount를 모델 Attribute에 기록한다. 루트의 BuildWorldGuiObjectCount는 TextLabel 등 GuiObject만 집계한다. 엔진과 아바타 성능은 포함하지 않는다.
+Studio Edit 상태에서 최신 Config와 CommerceConfig 및 생성기를 설치한 후 실행한다. Play 세션이 열려 있으면 교체 함수는 거부한다.
 
-## 실제 수행한 정적 검사
+```lua
+local builder = require(game.ServerStorage.NightShift.BuildWorld)
+local staging = Instance.new("Folder") -- Workspace 밖에서 후보 생성
+staging.Name = "NightShiftWorldStaging"
+local candidate = builder.build(staging)
+builder.validate(candidate)
+builder.replaceInEdit(workspace, candidate)
+staging:Destroy()
+```
 
-2026-10-31, 공식 [Luau 0.745 릴리스](https://github.com/luau-lang/luau/releases/tag/0.745)의 Windows compiler/AST 도구 사용. 다운로드 파일은 `.validation/`에만 두고 Git에서 제외했다. 추가 패키지·유료 API는 사용하지 않았다.
+`replaceInEdit`는 후보를 검증한 뒤 `NightShiftOwned=true`인 기존 동명 Model만 교체한다. 외부 소유 모델·동명 중복은 거부한다. 후보 parent 변경 실패 시 구모델 이름을 복원하며, 성공한 뒤 구모델을 제거한다. 사용자 Baseplate·Spawn·Lighting은 변경하지 않는다. 후보 확인 후 작업 파일을 저장하는 것은 통합자 몫이다.
+
+## 실제 수행한 오프라인 검사
 
 ```powershell
 .\tools\Invoke-Node.ps1 tools/world/verify-world.cjs tools/world/.validation/luau-0.745
 ```
 
-결과: exit 0. `luau-compile --null` 구문 컴파일 통과. 검사기는 BuildWorld를 실행하지 않고 compiler AST와 Config의 상수만 읽었다. 점포 충돌 상자 30개를 읽어 폭 4 studs의 평면 경로에서 필수 마커 8개 모두 6 studs 이내 접근 가능한지 확인했다. Spawn/Entry의 서버 목적지 기준 4×5.5×4 공간 충돌 없음, 도로 끝과 Hub 경계 연결, 금지 서비스/전역 삭제/대기 호출 부재를 확인했다. 결과 JSON은 `.validation/static-report.json`이다.
+기존 설치된 Luau 0.745 compiler/AST 도구 사용, 새 다운로드·패키지 설치 없음. 검사기는 Roblox 모듈을 실행하지 않고 실제 소스 AST와 두 Config 상수를 읽는다. `luau-compile --null` 통과, 점포 충돌 상자 39개 대상으로 반경3·1스터드 격자 탐색으로 14종 마커 접근 및 후문·양옆길 연결 통과, 폭8 트럭 이동 구간 충돌 없음, 12개 슬롯과 건축물 교차 없음, Spawn/Entry 목적지 여유 공간 통과. 8개 점포 배치/방향, Dock 일치, 설정 마커 중복, Hub/앞 인도 바닥 연결과 금지 호출 부재도 확인한다. 결과는 `.validation/static-report.json`에 기록한다.
 
-이 검사는 단순한 수치/AABB 격자 검사이며 Roblox 충돌·캐릭터 이동·계단·카메라·조도·글자 가독성의 실행 검증을 대체하지 않는다. 독립 Roblox 타입 분석, Studio 배치/require/build 재호출, 실제 Instance census, 서버 이동 안전 Raycast, 2~4인 통행, 점포별 정전, 스트리밍, 16인 및 모바일 성능은 미실행이다. Studio 조작·게임 실행·게시·판매는 하지 않았다.
+전체 Part·Light 예산은 생성 시 `checkBudget`으로 강제하고 모델의 BuildPartCount/BuildLightCount에 기록한다. 모든 형상은 Anchored, CastShadow=false이며 Light.Shadows=false다. 이 비용 제한은 16명 목표 성능의 실측값이 아니다.
 
-API 확인: [Model.WorldPivot](https://create.roblox.com/docs/reference/engine/classes/Model#WorldPivot), [PointLight](https://create.roblox.com/docs/reference/engine/classes/PointLight) 공식 문서를 참조했다.
+Studio require/build/validate/replace의 실제 Instance 동작, 실제 census, 아바타·카메라·글자·야간 조도, 서버 정전/도난 알람 분리, 멀티플레이·모바일·16인 부하는 미검증이다. 평면 AABB 검사는 Roblox 충돌·Pathfinding·이동 보안 검증을 대체하지 않는다. Studio 실행·게시·실제 판매는 수행하지 않았다.

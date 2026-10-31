@@ -36,7 +36,8 @@ graph=function(){
   const answered=chats.some(c=>(c.messages||[]).some(m=>m.participantName===name));
   box(name,coords[name],aliases[name]||model.label(name).replace(' 워커',''),info.short+' · '+info.source,connected?(busy?'명령 수신 · 응답 대기':answered?'응답 완료 · 대기':'등록됨 · 대기'):'마지막 기록',false,busy,()=>showNode(latest||null,name),model.activityText(info,busy&&connected));
  }
- root.style.height=h+'px';root.setAttribute('viewBox',`0 0 ${w} ${h}`);
+ const focusHeight=innerHeight-document.querySelector('.map-heading').getBoundingClientRect().height-20;
+ root.style.height=(document.body.classList.contains('map-focus')?Math.min(h,Math.max(260,focusHeight)):h)+'px';root.setAttribute('viewBox',`0 0 ${w} ${h}`);
 };
 const fleetFocus=document.createElement('button');fleetFocus.type='button';fleetFocus.id='fleet-focus';
 function setFleetFocus(on){document.body.classList.toggle('map-focus',on);document.body.classList.remove('detail-open');fleetFocus.textContent=on?'통신·기록 보기':'전체 지도 크게';signature='';if(state)render();}

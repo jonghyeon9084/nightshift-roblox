@@ -13,6 +13,7 @@
 - Roblox 기본 근접 음성 채팅 지원 준비. 계정의 음성 자격·지역·연령 확인·마이크 동의는 Roblox 정책과 사용자 선택을 따른다. 강제 마이크 켜기·별도 녹음·전사·외부 음성 API 없음. 비음성 핑/경보/텍스트 안내로도 플레이 가능.
 - 레벨로 핵심 기능과 도구를 무료 해금. 예: 손수레(자기 점포 운반), 재고 스캐너, 진열 프리셋. 첫 주문/기본 운반/판매/경보는 레벨이나 결제로 막지 않는다.
 - 유료 후보: 특별한 외형의 도구, 추가 배치 저장 슬롯, 간판/유니폼 묶음. 무료 대응 기능을 제공하고 도난 성공률·희귀 재고 선점·경보 해제·랭킹 점수를 판매하지 않는다. 실제 Robux ID/가격/판매는 초안이며 결제 호출은 기본 비활성이다.
+- 개발자 광고 수익을 위한 Roblox 공식 이미지 광고판을 거리와 매장 내부에 자연스럽게 배치한다. 기본은 도로변 간판 2개 + 각 매장 내벽 포스터형 1개이며, 실제 8매장에서는 총 10개다. 내부는 공식 규격 안에서 작은 면을 사용하고 직접 제작한 Part와 AdGui로 구성한다. 진열·주문·배송·도난·경보를 가리거나 통행을 방해하지 않는다. 영상 자동재생·강제 시청·게임 진행 제한·광고 시청에 따른 경쟁 보너스는 넣지 않는다. 광고 비대상·광고 미배정 시 공식 기본 대체 이미지를 사용한다. 설치 코드와 실제 광고 송출·수익 발생을 구분한다. 상세 설치와 검증은 docs/implementation/advertising.md에 기록한다.
 
 ## 구현 원칙과 초기 균형
 - 점포 소속과 방문 위치를 구분한다. 기존 타 점포 경계 강제 복귀 로직을 그대로 두면 침입/도난이 불가능하므로 명시적으로 조정한다. 방문은 가능하지만 주문·금고·진열 관리 권한은 소속 점포만 가진다.
@@ -40,4 +41,6 @@ Planner는 첫 5분, 한 교대, 여러 날의 반복 흐름과 실패/도난 �
 - https://create.roblox.com/docs/cloud-services/data-stores/player-data-purchasing
 - https://create.roblox.com/docs/chat/voice-chat
 - https://en.help.roblox.com/hc/en-us/articles/34506487825428-How-do-I-turn-on-Voice-Chat
+- https://create.roblox.com/docs/production/monetization/immersive-ads
+- https://create.roblox.com/docs/reference/engine/classes/AdGui
 

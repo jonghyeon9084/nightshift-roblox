@@ -83,14 +83,6 @@ local function lamp(fixture: Part, storeId: string?)
 	light.Parent = fixture
 end
 
-local function bench(parent: Instance, cf: CFrame, name: string)
-	part(parent, name .. "Seat", Vector3.new(10, 0.6, 3), cf * CFrame.new(0, 2, 0), C.wood)
-	part(parent, name .. "Back", Vector3.new(10, 2.5, 0.5), cf * CFrame.new(0, 3.3, -1.4), C.wood)
-	for _, x in ipairs({ -3.5, 3.5 }) do
-		part(parent, name .. "Leg", Vector3.new(0.6, 2, 2.6), cf * CFrame.new(x, 1, 0), C.dark)
-	end
-end
-
 local function spawn(parent: Instance, cf: CFrame, size: Vector3, storeId: string?): SpawnLocation
 	local object = Instance.new("SpawnLocation")
 	object.Name = "Spawn"
@@ -109,7 +101,7 @@ local function spawn(parent: Instance, cf: CFrame, size: Vector3, storeId: strin
 	return object
 end
 
-local function makeStore(stores: Instance, streets: Instance, config: any, storeId: string, index: number)
+local function makeStore(stores: Instance, config: any, commerce: any, storeId: string, index: number)
 	local definition = config.World.Stores[storeId]
 	local pivot = CFrame.new(vector(definition.Position)) * CFrame.Angles(0, math.rad(definition.YawDegrees), 0)
 	local store = Instance.new("Model")
@@ -120,12 +112,14 @@ local function makeStore(stores: Instance, streets: Instance, config: any, store
 	local decor = container("Folder", "Architecture", store)
 	local lights = container("Folder", "Lights", store)
 	lights:SetAttribute("StoreId", storeId)
-	local accent = ACCENTS[index]
+	local accent = ACCENTS[(index - 1) % #ACCENTS + 1]
 	local function block(name: string, size: Vector3, position: Vector3, color: Color3, solid: boolean?): Part
 		return part(decor, name, size, pivot * CFrame.new(position), color, solid)
 	end
 	block("Floor", Vector3.new(56, 1, 48), Vector3.new(0, -0.5, 0), C.floor)
-	block("BackWall", Vector3.new(56, 18, 1), Vector3.new(0, 9, -24.5), C.wall)
+	-- Ten-stud rear opening at x=18..28, with thirteen studs headroom.
+	block("BackWall", Vector3.new(46, 18, 1), Vector3.new(-5, 9, -24.5), C.wall)
+	block("BackHeader", Vector3.new(10, 5, 1), Vector3.new(23, 15.5, -24.5), C.wall)
 	block("LeftWall", Vector3.new(1, 18, 48), Vector3.new(-28.5, 9, 0), C.wall)
 	block("RightWall", Vector3.new(1, 18, 48), Vector3.new(28.5, 9, 0), C.wall)
 	block("Roof", Vector3.new(58, 1, 50), Vector3.new(0, 18.5, 0), C.dark)
@@ -141,60 +135,80 @@ local function makeStore(stores: Instance, streets: Instance, config: any, store
 	text(sign, definition.Name .. " " .. definition.Shape .. "\n오늘도 정상영업")
 	block("Awning", Vector3.new(58, 0.5, 7 + index), Vector3.new(0, 13, 27), accent)
 	block("Forecourt", Vector3.new(56, 1, 12), Vector3.new(0, -0.5, 30), C.pavement)
-	-- Warehouse in the rear right: its eight-stud open doorway is x=20..28, z=-12.
-	block("WarehouseSide", Vector3.new(0.5, 12, 12), Vector3.new(10, 6, -18), C.wall)
-	block("WarehouseFront", Vector3.new(10, 12, 0.5), Vector3.new(15, 6, -12), C.wall)
-	local warehouseSign = block("WarehouseSign", Vector3.new(8, 2, 0.4), Vector3.new(24, 11, -12), C.dark, false)
-	text(warehouseSign, "창고\n차단기 ↓")
-	for _, x in ipairs({ 13, 16 }) do
-		block("StorageBox", Vector3.new(2, 2, 2), Vector3.new(x, 1, -21), C.wood)
+	-- Rear office/storage remain open to the shelf aisle and rear loading door.
+	block("OfficeDesk", Vector3.new(6, 2, 3), Vector3.new(-16, 1, -19), C.wood)
+	local officeSign = block("OfficeSign", Vector3.new(10, 2, 0.2), Vector3.new(-16, 7, -23), C.dark, false)
+	text(officeSign, "사무실 PC · 재고 주문")
+	block("WarehousePad", Vector3.new(10, 0.05, 6), Vector3.new(0, 0.025, -18), C.pavement, false)
+	local warehouseSign = block("WarehouseSign", Vector3.new(12, 2, 0.2), Vector3.new(0, 7, -23), C.dark, false)
+	text(warehouseSign, "창고 · 직접 운반\n하역은 후문 →")
+	block("LoadingPad", Vector3.new(12, 1, 9), Vector3.new(23, -0.5, -29), C.pavement)
+	for _, x in ipairs({ -33, 33 }) do
+		block("SideWalk", Vector3.new(8, 1, 68), Vector3.new(x, -0.5, 1), C.pavement)
+	end
+	block("RearWalk", Vector3.new(74, 1, 8), Vector3.new(0, -0.5, -29), C.pavement)
+	-- Legacy Shelf markers keep their contract coordinates; open racks expose lower slots.
+	for _, x in ipairs({ -16, 0, 16 }) do
+		block("RackLower", Vector3.new(12, 0.3, 3), Vector3.new(x, 1.5, -8.5), C.wood)
+		block("RackUpper", Vector3.new(12, 0.3, 3), Vector3.new(x, 4.5, -8.5), C.wood)
+		block("RackBack", Vector3.new(12, 6, 0.3), Vector3.new(x, 3, -10.5), C.dark)
 	end
 	for _, markerName in ipairs(config.World.MarkerOrder) do
 		local spec = config.World.Markers[markerName]
 		if markerName == "Spawn" then
 			spawn(store, pivot * CFrame.new(vector(spec.Position)), vector(spec.Size), storeId)
 		else
+			local logical = markerName == "Entry" or string.sub(markerName, 1, 5) == "Shelf"
 			local marker = part(store, markerName, vector(spec.Size), pivot * CFrame.new(vector(spec.Position)),
-				if markerName == "Counter" then accent else C.dark, markerName ~= "Entry")
+				if markerName == "Counter" then accent else C.dark, not logical)
 			marker:SetAttribute("StoreId", storeId)
-			if markerName == "Entry" then marker.Transparency = 1 end
+			if logical then marker.Transparency = 1 end
 		end
 	end
-	local memo = block("ShiftMemo", Vector3.new(12, 3.5, 0.15), Vector3.new(-12, 7, 8), C.paper, false)
-	text(memo, config.Text.Memo, nil, true)
-	local panelSign = block("PanelHelp", Vector3.new(10, 2, 0.2), Vector3.new(-21, 8, -19), C.paper, false)
-	text(panelSign, "표시판 · 구간 읽기\n연결 → 순서 공유", nil, true)
-	local breakerSign = block("BreakerHelp", Vector3.new(8, 2, 0.2), Vector3.new(22, 8, -19), C.paper, false)
-	text(breakerSign, "차단기 · 순서 입력\n공유 상태는 화면에서 확인", nil, true)
+	for _, markerName in ipairs(commerce.World.MarkerOrder) do
+		local spec = commerce.World.Markers[markerName]
+		local marker = part(store, markerName, vector(spec.Size), pivot * CFrame.new(vector(spec.Position)), C.dark, false)
+		marker:SetAttribute("StoreId", storeId)
+		if markerName == "OfficePC" then
+			marker.Color = Color3.fromRGB(65, 170, 185)
+			text(marker, "재고 주문 PC")
+		elseif markerName == "Alarm" then
+			marker.Color = Color3.fromRGB(255, 68, 62)
+			local light = Instance.new("PointLight")
+			light.Name = "AlarmLight"
+			light.Color = marker.Color
+			light.Brightness = 2
+			light.Range = 24
+			light.Shadows = false
+			light.Enabled = false
+			light:SetAttribute("StoreId", storeId)
+			light:SetAttribute("AlarmControlled", true)
+			light.Parent = marker
+		else marker.Transparency = 1 end
+	end
+	local slots = container("Folder", "ShelfSlots", store)
+	for i, slotId in ipairs(commerce.World.ShelfSlotIds) do
+		local slot = part(slots, slotId, vector(commerce.World.ShelfSlotSize), pivot * CFrame.new(vector(commerce.World.ShelfSlotPositions[i])), C.dark, false)
+		slot.Transparency = 1
+		slot:SetAttribute("StoreId", storeId)
+		slot:SetAttribute("SlotId", slotId)
+		slot:SetAttribute("Capacity", commerce.World.ShelfSlotCapacity)
+	end
+	local route = container("Folder", "TruckRoute", store)
+	for i, routeId in ipairs(commerce.World.TruckRouteOrder) do
+		local marker = part(route, routeId, Vector3.new(1, 1, 1), pivot * CFrame.new(vector(commerce.World.TruckRoutePositions[routeId])), C.dark, false)
+		marker.Transparency = 1
+		marker:SetAttribute("StoreId", storeId)
+		marker:SetAttribute("RouteId", routeId)
+		marker:SetAttribute("Order", i)
+	end
 	-- No product labels or tray Parts here: the server owns their live contents.
 	for i, pos in ipairs({ Vector3.new(-15, 12, 2), Vector3.new(15, 12, 2), Vector3.new(22, 10, -18) }) do
 		local fixture = part(lights, "Fixture" .. i, Vector3.new(5, 0.3, 2), pivot * CFrame.new(pos), C.paper, false)
 		lamp(fixture, storeId)
 	end
 	store.WorldPivot = pivot
-	-- Streets use the same +Z direction, ending exactly at the Hub edge (local z=108).
-	local street = container("Model", "Street" .. index, streets)
-	part(street, "Road", Vector3.new(config.World.RoadWidth, 1, 84), pivot * CFrame.new(0, -0.5, 66), C.road)
-	for _, x in ipairs({ -12, 12 }) do
-		part(street, "Sidewalk", Vector3.new(6, 1, 84), pivot * CFrame.new(x, -0.45, 66), C.pavement)
-	end
-	for z = 42, 98, 14 do
-		part(street, "LaneDash", Vector3.new(0.4, 0.03, 5), pivot * CFrame.new(0, 0.025, z), C.paper, false)
-	end
-	for _, z in ipairs({ 48, 88 }) do
-		part(street, "LampPole", Vector3.new(0.7, 14, 0.7), pivot * CFrame.new(-14, 7, z), C.dark)
-		local fixture = part(street, "StreetLamp", Vector3.new(3, 0.5, 3), pivot * CFrame.new(-14, 14, z), C.paper, false)
-		lamp(fixture, nil)
-	end
-	local wayfinding = part(street, "Wayfinding", Vector3.new(12, 4, 0.5), pivot * CFrame.new(12, 5, 66), accent, false)
-	text(wayfinding, "↑ " .. definition.Name .. " " .. definition.Shape .. "\n↓ 중앙광장")
-	text(wayfinding, "↑ 중앙광장\n↓ " .. definition.Name .. " " .. definition.Shape, Enum.NormalId.Front)
-	part(street, "SignPost", Vector3.new(0.5, 4, 0.5), pivot * CFrame.new(12, 2, 66), C.dark)
-	-- Short side alley with a resting nook; not a required objective detour.
-	part(street, "Alley", Vector3.new(22, 1, 16), pivot * CFrame.new(25, -0.5, 44), C.pavement)
-	bench(street, pivot * CFrame.new(28, 0, 42), "Rest")
-	local backToHub = block("ExitGuide", Vector3.new(8, 2, 0.2), Vector3.new(0, 8, 23), C.dark, false)
-	text(backToHub, "중앙광장 ↑\n이동은 무료", Enum.NormalId.Front)
+
 end
 
 local function unique(parent: Instance, name: string, className: string): Instance
@@ -212,6 +226,8 @@ end
 
 local function checkRoot(root: Instance): Model
 	assert(root:IsA("Model") and root:GetAttribute("NightShiftOwned") == true, "NightShiftWorld ownership/type conflict")
+	assert(root:GetAttribute("CommerceLayoutVersion") == 2, "COMMERCE_LAYOUT_MISMATCH: stage and validate a replacement in Edit mode")
+	unique(root, "CommerceRuntime", "Folder")
 	local hub = unique(root, "Hub", "Model")
 	unique(root, "Stores", "Folder")
 	unique(hub, "Spawn", "SpawnLocation")
@@ -269,28 +285,57 @@ function Builder.build(parent: Instance): Model
 	local shared = if namespace then namespace:FindFirstChild("Shared") else nil
 	local module = if shared then shared:FindFirstChild("Config") else nil
 	assert(module and module:IsA("ModuleScript"), "ReplicatedStorage.NightShift.Shared.Config is required")
-	local config = require(module :: ModuleScript)
+	local legacy = require(module :: ModuleScript)
+	local commerceModule = shared:FindFirstChild("CommerceConfig")
+	assert(commerceModule and commerceModule:IsA("ModuleScript"), "CommerceConfig is required")
+	local commerce = require(commerceModule :: ModuleScript)
+	assert(commerce.World.LayoutVersion == 2, "Unsupported commerce layout")
+	local config = table.clone(legacy)
+	config.World = table.clone(legacy.World)
+	for _, key in ipairs({ "Name", "OwnerAttribute", "StoreSize", "RoadWidth", "RoadLength", "SidewalkWidth", "HubPosition", "HubSize", "HubSpawn", "HubStoreSelect", "StoreIds", "Stores" }) do
+		config.World[key] = commerce.World[key]
+	end
+	config.Capacity = commerce.Capacity
+	config.Budget = commerce.Budget
 	assert(config.ContractVersion == "1.0.0", "Unsupported world contract")
 	local root = Instance.new("Model")
 	root.Name = config.World.Name
 	root:SetAttribute(config.World.OwnerAttribute, true)
+	root:SetAttribute("CommerceLayoutVersion", commerce.World.LayoutVersion)
+	container("Folder", "CommerceRuntime", root)
 	local ok, problem = pcall(function()
 		local hub = Instance.new("Model")
 		hub.Name = config.World.HubName
 		hub.Parent = root
-		part(hub, "Plaza", vector(config.World.HubSize), CFrame.new(0, -0.5, 0), C.pavement)
+		local hubPosition = vector(config.World.HubPosition)
+		part(hub, "Plaza", vector(config.World.HubSize), CFrame.new(hubPosition + Vector3.new(0, -0.5, 0)), C.pavement)
 		spawn(hub, CFrame.new(vector(config.World.HubSpawn)), Vector3.new(8, 1, 8), nil)
-		local selection = part(hub, "StoreSelect", Vector3.new(12, 4, 2), CFrame.new(vector(config.World.HubStoreSelect)), C.dark)
-		text(selection, "오늘도 정상영업\n점포 선택 · 무료 이동")
-		local map = part(hub, "Directory", Vector3.new(22, 7, 0.6), CFrame.new(0, 6, -24), C.dark)
-		text(map, "↑ 01 달빛점 ○\n← 04 별빛점 ◇     02 골목점 △ →\n↓ 03 새벽점 □\n준비 후 근무 · 음성 없이 협동")
-		bench(hub, CFrame.new(-24, 0, 10) * CFrame.Angles(0, math.rad(90), 0), "West")
-		bench(hub, CFrame.new(24, 0, 10) * CFrame.Angles(0, math.rad(-90), 0), "East")
+		local selection = part(hub, "StoreSelect", Vector3.new(12, 4, 2), CFrame.new(vector(config.World.HubStoreSelect)), C.dark, false)
+		text(selection, "오늘도 정상영업\n8개 점포 · 무료 이동")
+		local map = part(hub, "Directory", Vector3.new(18, 7, 0.6), CFrame.new(hubPosition + Vector3.new(0, 6, 16)), C.dark, false)
+		text(map, "직선도로 양쪽 4개 점포\nPC 주문 → 후문 하역 → 직접 진열\n음성 없이도 협동 가능")
 		local stores = container("Folder", config.World.StoresName, root)
 		local streets = container("Model", "Streets", root)
-		for index, storeId in ipairs(config.World.StoreIds) do makeStore(stores, streets, config, storeId, index) end
+		part(streets, "MainRoad", Vector3.new(config.World.RoadLength, 1, config.World.RoadWidth), CFrame.new(0, -0.5, 0), C.road)
+		for _, side in ipairs({ -1, 1 }) do
+			part(streets, "Sidewalk", Vector3.new(config.World.RoadLength, 1, config.World.SidewalkWidth), CFrame.new(0, -0.5, side * 17), C.pavement)
+			part(streets, "ServiceLane", Vector3.new(config.World.RoadLength, 1, 12), CFrame.new(0, -0.5, side * 91), C.road)
+		end
+		part(streets, "HubWalk", Vector3.new(10, 1, 12), CFrame.new(-190, -0.5, 27), C.pavement)
+		for x = -180, 180, 20 do
+			part(streets, "LaneDash", Vector3.new(8, 0.03, 0.4), CFrame.new(x, 0.025, 0), C.paper, false)
+		end
+		for _, x in ipairs({ -160, -80, 80, 160 }) do
+			for _, side in ipairs({ -1, 1 }) do
+				part(streets, "LampPole", Vector3.new(0.6, 14, 0.6), CFrame.new(x, 7, side * 21), C.dark)
+				local fixture = part(streets, "StreetLamp", Vector3.new(3, 0.5, 3), CFrame.new(x, 14, side * 21), C.paper, false)
+				lamp(fixture, nil)
+			end
+		end
+		for index, storeId in ipairs(config.World.StoreIds) do makeStore(stores, config, commerce, storeId, index) end
 		checkRoot(root)
 		checkBudget(root, config)
+		Builder.validate(root)
 	end)
 	if not ok then
 		root:Destroy() -- Only our unattached, partially built model.
@@ -298,6 +343,88 @@ function Builder.build(parent: Instance): Model
 	end
 	root.Parent = parent -- Publish only after the complete hierarchy exists.
 	return root
+end
+
+-- Explicit candidate validation is separate from per-store runtime availability checks.
+-- Use a temporary Folder as build(parent), then validate before replacing the live root.
+function Builder.validate(root: Model): Model
+	checkRoot(root)
+	local namespace = game:GetService("ReplicatedStorage"):FindFirstChild("NightShift")
+	local shared = if namespace then namespace:FindFirstChild("Shared") else nil
+	assert(shared, "Missing Shared")
+	local legacyModule = unique(shared, "Config", "ModuleScript")
+	local commerceModule = unique(shared, "CommerceConfig", "ModuleScript")
+	local legacy = require(legacyModule :: ModuleScript)
+	local commerce = require(commerceModule :: ModuleScript)
+	local stores = unique(root, "Stores", "Folder")
+	assert(#stores:GetChildren() == #commerce.World.StoreIds, "Unexpected store count")
+	local runtime = unique(root, "CommerceRuntime", "Folder")
+	assert(#runtime:GetChildren() == 0, "Replacement candidate contains runtime state")
+	for _, storeId in ipairs(commerce.World.StoreIds) do
+		local store = unique(stores, storeId, "Model") :: Model
+		local definition = commerce.World.Stores[storeId]
+		local pivot = CFrame.new(vector(definition.Position)) * CFrame.Angles(0, math.rad(definition.YawDegrees), 0)
+		assert(store:GetAttribute("StoreId") == storeId and store:GetAttribute("DisplayName") == definition.Name, "Store identity mismatch: " .. storeId)
+		assert((store:GetPivot().Position - pivot.Position).Magnitude < 0.001, "Store pivot mismatch: " .. storeId)
+		local function marker(parent: Instance, name: string, spec: any, logical: boolean): BasePart
+			local object = unique(parent, name, spec.ClassName or "Part") :: BasePart
+			assert(object:GetAttribute("StoreId") == storeId, "Marker ownership mismatch: " .. name)
+			assert((object.Size - vector(spec.Size)).Magnitude < 0.001, "Marker size mismatch: " .. name)
+			assert((object.Position - (pivot * CFrame.new(vector(spec.Position))).Position).Magnitude < 0.001, "Marker position mismatch: " .. name)
+			assert(object.Anchored and not object.CanTouch and not object.CastShadow, "Unsafe marker: " .. name)
+			if logical then assert(not object.CanCollide and not object.CanQuery, "Solid logic marker: " .. name) end
+			return object
+		end
+		for _, name in ipairs(legacy.World.MarkerOrder) do
+			marker(store, name, legacy.World.Markers[name], name == "Entry" or string.sub(name, 1, 5) == "Shelf")
+		end
+		for _, name in ipairs(commerce.World.MarkerOrder) do
+			local object = marker(store, name, commerce.World.Markers[name], true)
+			if name ~= "OfficePC" and name ~= "Alarm" then assert(object.Transparency == 1, "Visible logic marker") end
+		end
+		local slots = unique(store, "ShelfSlots", "Folder")
+		assert(#slots:GetChildren() == #commerce.World.ShelfSlotIds, "Unexpected slot count")
+		for i, id in ipairs(commerce.World.ShelfSlotIds) do
+			local slot = marker(slots, id, {Size = commerce.World.ShelfSlotSize, Position = commerce.World.ShelfSlotPositions[i]}, true)
+			assert(slot.Transparency == 1 and slot:GetAttribute("SlotId") == id and slot:GetAttribute("Capacity") == commerce.World.ShelfSlotCapacity, "Slot metadata mismatch")
+		end
+		local route = unique(store, "TruckRoute", "Folder")
+		assert(#route:GetChildren() == #commerce.World.TruckRouteOrder, "Unexpected route count")
+		for i, id in ipairs(commerce.World.TruckRouteOrder) do
+			local point = marker(route, id, {Size = {1, 1, 1}, Position = commerce.World.TruckRoutePositions[id]}, true)
+			assert(point.Transparency == 1 and point:GetAttribute("RouteId") == id and point:GetAttribute("Order") == i, "Route metadata mismatch")
+		end
+		local alarm = unique(store, "Alarm", "Part")
+		local light = unique(alarm, "AlarmLight", "PointLight") :: PointLight
+		assert(#alarm:GetChildren() == 1 and not light.Enabled and light:GetAttribute("OutageControlled") == nil, "Alarm must start disabled and separate from outage lights")
+	end
+	checkBudget(root, commerce)
+	return root
+end
+
+function Builder.replaceInEdit(parent: Instance, candidate: Model): Model
+	assert(not game:GetService("RunService"):IsRunning(), "Replacement requires Edit mode; stop the session first")
+	assert(candidate.Parent ~= parent and candidate.Name == "NightShiftWorld", "Build candidate in a separate staging Folder")
+	Builder.validate(candidate)
+	local old: Instance? = nil
+	for _, child in ipairs(parent:GetChildren()) do
+		if child.Name == "NightShiftWorld" then
+			assert(old == nil, "Duplicate existing world roots")
+			assert(child:IsA("Model") and child:GetAttribute("NightShiftOwned") == true, "Refusing to replace foreign world")
+			old = child
+		end
+	end
+	-- No yielding; unrelated Baseplate, Spawn and Lighting are never touched.
+	local previousParent = candidate.Parent
+	if old then old.Name = "NightShiftWorld_Previous" end
+	local ok, problem = pcall(function() candidate.Parent = parent end)
+	if not ok then
+		candidate.Parent = previousParent
+		if old then old.Name = "NightShiftWorld" end
+		error("World replacement failed: " .. tostring(problem))
+	end
+	if old then old:Destroy() end
+	return candidate
 end
 
 return Builder
