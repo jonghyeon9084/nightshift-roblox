@@ -240,4 +240,19 @@ function Builder.validate(root: Model): Result
 	return if ok then result else unavailable(result)
 end
 
+-- Studio can retain an invalid preview when AdGui was assembled outside Workspace.
+-- Reattach only our validated units after the completed world enters Workspace.
+function Builder.refreshInWorkspace(root: Model): Result
+	local result = Builder.validate(root)
+	if not result.Ok then return result end
+	assert(root:IsDescendantOf(workspace), "Refresh requires an installed world")
+	for _, model in ipairs((result.Folder :: Folder):GetChildren()) do
+		local surface = model:FindFirstChild("AdSurface") :: Part
+		local ad = surface:FindFirstChild("ImageAd") :: AdGui
+		ad.Parent = nil
+		ad.Parent = surface
+	end
+	return result
+end
+
 return Builder

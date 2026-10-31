@@ -127,6 +127,18 @@ local function defaults(config)
 		CompletedFirstShift=false, RewardCursor={Epoch=0,Sequence=0}, Session=false }
 end
 
+local Shared = game:GetService("ReplicatedStorage").NightShift.Shared
+local SoloProfile = require(Shared.SoloStoreProfile)
+local Contract = require(Shared.SoloStoreContract)
+ProfileService.normalizeLegacy = normalize
+local function normalizeV2(raw, config, userId)
+	local legacy = copy(config)
+	legacy.SchemaVersion = 1
+	legacy.Capacity.SeatsPerStore = 4
+	legacy.Ranking.ModeTags = {"Coop", "Solo", "Practice", "Support"}
+	return SoloProfile.migrate(raw, config, Contract, function(value) return normalize(value, legacy) end, userId)
+end
+
 -- Memory is explicit, process-local and never falls back to DataStore.
 function ProfileService.newMemoryStore()
 	local records = {}
@@ -152,6 +164,7 @@ function ProfileService.new(deps)
 	local mode = store.Mode or deps.Config.Profile.DefaultMode
 	assert(mode == "Memory" or mode == "DataStore", "Unknown storage mode")
 	return setmetatable({ config=deps.Config, store=store, mode=mode, now=deps.UnixNow, sessionId=deps.SessionId,
+		studioMemoryUsers=deps.IsStudio==true and mode=="Memory",
 		onStatus=deps.OnStatus, entries={}, closing=false, deadline=false,
 		-- Optional deterministic retry/close hooks; Roblox task.wait/os.clock are the defaults.
 		wait=deps.Wait or function(seconds) task.wait(seconds) end,
@@ -184,7 +197,8 @@ function ProfileService:status(id)
 		SavedRevision=e and e.savedRevision or 0, Epoch=e and e.epoch or 0,
 		-- Extension for Main's new-participation gate; do not expose Session.Id.
 		Frozen=self.closing or not e or not e.profile or e.state == "LeaseLost" or e.state == "Released"
-			or e.releasing == true or self.now() >= e.leaseUntil - self.config.Profile.FreezeBeforeExpirySeconds }
+			or e.barrier == true or e.releasing == true or self.now() >= e.leaseUntil - self.config.Profile.FreezeBeforeExpirySeconds,
+		ErrorCode=e and e.errorCode or false }
 end
 
 function ProfileService:_update(key, transform)
@@ -218,27 +232,37 @@ function ProfileService:_update(key, transform)
 end
 
 function ProfileService:load(id)
-	if not integer(id, MAX_INT, 1) then return result(false,"BAD_REQUEST") end
+	-- Studio's real local test players use negative UserIds. Keep those IDs
+	-- distinct, memory-only, and impossible to accept in a DataStore adapter.
+	local studioUser=self.studioMemoryUsers and integer(id,-1,-MAX_INT)
+	if not integer(id, MAX_INT, 1) and not studioUser then return result(false,"BAD_REQUEST") end
 	if self.closing then return result(false,"PROFILE_UNAVAILABLE") end
 	local oldEntry = self.entries[id]
 	if oldEntry then
-		if oldEntry.busy then return result(false,"REQUEST_IN_PROGRESS") end
-		if oldEntry.profile and oldEntry.state ~= "Released" then return self:get(id) end
+		if oldEntry.busy or oldEntry.mutating then return result(false,"REQUEST_IN_PROGRESS") end
+		self:_refresh(oldEntry)
+		if oldEntry.profile and oldEntry.state ~= "Released" and oldEntry.state ~= "LeaseLost" then return self:get(id) end
 	end
 	local e = {state="Loading",busy=true,profile=nil,savedRevision=0,epoch=0,leaseUntil=0,nextSave=0}
 	self.entries[id] = e; self:_notify(id)
 	local value, code = self:_update(self.config.Profile.KeyPrefix .. tostring(id), function(raw, now)
 		local p, why
-		if raw == nil then p = defaults(self.config) else p, why = normalize(raw,self.config) end
+		if raw == nil then p = SoloProfile.new(self.config) else p, why = normalizeV2(raw,self.config,id) end
 		if not p then return nil, why end
 		local session = p.Session
 		if session and session.ExpiresAt > now and session.Id ~= self.sessionId then return nil,"SESSION_LOCKED" end
+		-- A disconnected, lost writer must reload persisted data under a new epoch.
+		-- A retried UpdateAsync may already have committed that newer epoch.
+		local staleEpoch = oldEntry and oldEntry.state == "LeaseLost" and oldEntry.epoch
 		local reacquire = session and session.ExpiresAt > now and session.Id == self.sessionId
+			and (not staleEpoch or session.Epoch > staleEpoch)
 		if not reacquire then
 			local epoch = math.max(p.RewardCursor.Epoch, session and session.Epoch or 0) + 1
 			if not integer(epoch) or not integer(p.Revision + 1) then return nil,"PROFILE_CORRUPT" end
 			p.Revision += 1
 			p.RewardCursor = {Epoch=epoch,Sequence=0}
+			p.EconomyCursor = {Epoch=epoch,Sequence=0}
+			p.ActivityCursor = {Epoch=epoch,Sequence=0}
 			p.Session = {Id=self.sessionId,Epoch=epoch,ExpiresAt=now+self.config.Profile.LeaseSeconds}
 		else
 			p.Session.ExpiresAt = now + self.config.Profile.LeaseSeconds
@@ -247,13 +271,14 @@ function ProfileService:load(id)
 	end)
 	e.busy = false
 	if value then
-		local verified, why = normalize(value,self.config)
+		local verified, why = normalizeV2(value,self.config,id)
 		if not verified then value=nil; code=why
 		elseif not verified.Session or verified.Session.Id ~= self.sessionId or verified.Session.ExpiresAt <= self.now() then
 			value=nil; code="LEASE_LOST"
 		else value=verified end
 	end
 	if not value then
+		e.errorCode=code
 		e.state = code == "SESSION_LOCKED" and "Locked" or "LoadFailed"
 		self:_notify(id)
 		return result(false,code == "SAVE_FAILED" and "PROFILE_UNAVAILABLE" or code)
@@ -289,13 +314,17 @@ function ProfileService:mutate(id, epoch, fn)
 	e.mutating = false
 	if not ok or yielded then return result(false,"INTERNAL_ERROR") end
 	if candidate == nil then return result(false,"INVALID_STATE") end
-	local p, code = normalize(candidate,self.config)
+	local p, code = normalizeV2(candidate,self.config,id)
 	if not p then return result(false,code) end
 	-- These fields are owned by Profiles. Reward cursor advances atomically, one at a time.
 	if p.Revision ~= previous.Revision or not p.Session or p.Session.Id ~= self.sessionId
 		or p.Session.Epoch ~= e.epoch or p.Session.ExpiresAt ~= previous.Session.ExpiresAt
 		or p.RewardCursor.Epoch ~= e.epoch or p.RewardCursor.Sequence < previous.RewardCursor.Sequence
 		or p.RewardCursor.Sequence > previous.RewardCursor.Sequence + 1 then return result(false,"PROFILE_CORRUPT") end
+	for _,name in ipairs({"EconomyCursor","ActivityCursor"}) do
+		if p[name].Epoch~=e.epoch or p[name].Sequence<previous[name].Sequence
+			or p[name].Sequence>previous[name].Sequence+1 then return result(false,"PROFILE_CORRUPT") end
+	end
 	if self:status(id).Frozen or e.profile ~= previous then return result(false,"PROFILE_UNAVAILABLE") end
 	if not integer(previous.Revision+1) then return result(false,"PROFILE_CORRUPT") end
 	p.Revision=previous.Revision+1; e.profile=p; self:_notify(id)
@@ -314,7 +343,7 @@ function ProfileService:save(id, release)
 	e.busy=true; e.releasing=release; e.state="Saving"; self:_notify(id)
 	local value, code = self:_update(self.config.Profile.KeyPrefix .. tostring(id), function(raw, now)
 		if raw == nil then return nil,"LEASE_LOST" end
-		local persisted, why = normalize(raw,self.config)
+		local persisted, why = normalizeV2(raw,self.config,id)
 		if not persisted then return nil,why end
 		local session = persisted.Session
 		if not session or session.Id ~= self.sessionId or session.Epoch ~= e.epoch or session.ExpiresAt <= now then
@@ -328,7 +357,7 @@ function ProfileService:save(id, release)
 	end)
 	e.busy=false; e.releasing=false
 	if value then
-		local verified, why = normalize(value,self.config)
+		local verified, why = normalizeV2(value,self.config,id)
 		if not verified then value=nil; code=why
 		elseif verified.Revision ~= snapshot.Revision or (release and verified.Session ~= false)
 			or (not release and (not verified.Session or verified.Session.Id ~= self.sessionId or verified.Session.Epoch ~= e.epoch)) then
@@ -349,11 +378,22 @@ function ProfileService:save(id, release)
 		e.state=code == "LEASE_LOST" and "LeaseLost" or "SaveFailed"
 		self:_refresh(e)
 	end
+	e.errorCode=not value and code or false
 	e.nextSave=self.now()+math.min(self.config.Profile.AutosaveSeconds,self.config.Profile.RenewSeconds)
 	self:_notify(id)
 	if not value then return result(false,code) end
 	if e.state == "LeaseLost" then return result(false,"LEASE_LOST") end
 	return result(true,"OK",snapshot.Revision)
+end
+
+-- Main enters this only after inventory settlement in the serial economic queue.
+-- A departure barrier is never reopened after a failed save.
+function ProfileService:beginBarrier(id, reason)
+	local e=self.entries[id]
+	if not e or not e.profile then return result(false,"PROFILE_UNAVAILABLE") end
+	if self:status(id).Frozen and not e.barrier then return result(false,"PROFILE_FROZEN") end
+	e.barrier=true; e.barrierReason=reason; self:_notify(id)
+	return result(true,"OK",e.profile.Revision)
 end
 
 function ProfileService:due()

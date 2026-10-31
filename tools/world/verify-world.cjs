@@ -100,14 +100,88 @@ for(const name of ['Spawn','Entry']) {
   const clearance={pos:[m.Position[0],m.Position[1]+cfg.World.SpawnLift,m.Position[2]],size:[4,5.5,4]};
   assert(!boxes.some(b=>b.solid && overlap(clearance,b)),`${name} clearance obstructed`);
 }
+// Report coincident boundary planes for visible warehouse, office and LCD pieces.
+const auditedNames=new Set(['BackWall','OfficeDesk','OfficeSign','WarehousePad','WarehouseSign','OfficeWarehouseDivider','WarehouseSide','WarehouseDoorHeader','OfficeDoorHeader','WarehouseDoorSign','WarehouseShelf','InformationLCD','LCDFrame','LCDStand']);
+const audited=boxes.filter(b=>auditedNames.has(b.name));
+let coincident=[];
+for(let i=0;i<audited.length;i++) for(let j=0;j<i;j++) {
+ const a=audited[i],b=audited[j];
+ for(let axis=0;axis<3;axis++) {
+  let shared=[-1,1].some(sa=>[-1,1].some(sb=>Math.abs(a.pos[axis]+sa*a.size[axis]/2-b.pos[axis]-sb*b.size[axis]/2)<1e-5));
+  if(shared && [0,1,2].filter(k=>k!==axis).every(k=>Math.abs(a.pos[k]-b.pos[k])<(a.size[k]+b.size[k])/2-1e-5)) coincident.push(`${a.name}/${b.name} axis${axis}`);
+ }
+}
+assert.deepEqual(coincident.sort(),['LCDStand/InformationLCD axis1','OfficeWarehouseDivider/BackWall axis2','WarehouseSide/BackWall axis2'].sort(), 'Unexpected selected shared face');
+console.log('Intentional selected shared planes:',JSON.stringify(coincident));
 // Every shelf slot needs physical space: lower items cannot sit inside legacy solid blocks.
 for(const [i,pos] of commerce.World.ShelfSlotPositions.entries()) {
  const slot={pos,size:commerce.World.ShelfSlotSize};
  assert(!boxes.some(b=>b.solid && overlap(slot,b)),`Shelf slot ${i+1} embedded in architecture`);
 }
+// 24 warehouse anchors fit reduced 0.7 x 1.4 x 0.7 item views between shelf plates.
+const storagePositions=[2.4,4.4].flatMap(y=>[-6.4,-5.6].flatMap(x=>[-22.5,-21.5,-20.5,-19.5,-18.5,-17.5].map(z=>[x,y,z])));
+for (let i=0;i<storagePositions.length;i++) {
+ const item={pos:storagePositions[i],size:[0.7,1.4,0.7]};
+ assert(!boxes.some(b=>b.solid && overlap(item,b)),`Warehouse anchor ${i+1} item intersects solid architecture`);
+ for(let j=0;j<i;j++) assert(!overlap(item,{pos:storagePositions[j],size:item.size}),`Warehouse items ${i+1}/${j+1} overlap`);
+}
+// Current server WorldAdapter WarehouseBin layout extends to the upgraded 32 bins.
+assert.equal(commerce.Upgrades.Warehouse.Capacities['1'],32);
+const runtimeWarehouse=Array.from({length:32},(_,i)=>[(i%4-1.5)*1.5,1+0.8+Math.floor(i/8)*1.5,-18+(Math.floor(i/4)%2)*1.5-0.75]);
+for(let i=0;i<runtimeWarehouse.length;i++) {
+ const item={pos:runtimeWarehouse[i],size:[1.2,1.4,1.2]};
+ assert(!boxes.some(b=>b.solid && overlap(item,b)),`Runtime warehouse item ${i+1} intersects architecture`);
+ for(let j=0;j<i;j++) assert(!overlap(item,{pos:runtimeWarehouse[j],size:item.size}),`Runtime warehouse items overlap`);
+}
+console.log('Warehouse rendered bins: 32 full-size item boxes clear of inspected architecture and one another (static; does not prove server allocation or reachability).');
+// Marker and fixtures are generated outside block(); count from the build loops.
+const perStore=boxes.length+commerce.World.MarkerOrder.length+storagePositions.length+commerce.World.ShelfSlotIds.length+commerce.World.TruckRouteOrder.length+3;
+// Eight paths x ten nodes; 18 traffic nodes and 12 road/signal decorations.
+const common=4+1+2+2+1+19+16+80+18+12;
+assert(perStore<=commerce.Budget.StoreParts);
+assert(common<=commerce.Budget.CommonParts);
+assert(perStore*8+common+28<=commerce.Budget.TotalParts);
 // Rear entry and both side paths must connect to front, not merely to markers.
 for (const [x,z] of [[24,-28],[0,-30],[-34,0],[34,0],[24,-38]])
  assert(queue.some(p=>Math.hypot(p[0]-x,p[1]-z)<=2),`Closed walkway at ${x},${z}`);
+// Explicit route points share the single conservative radius-3 flood-fill component.
+for(const [name,x,z] of [['warehouse entrance',0,-14],['warehouse drop',0,-18],['rear opening',23,-24],['rear walk',23,-30],['ramp approach',23,-34],['theft return',18,14]]) {
+ assert(queue.some(p=>Math.hypot(p[0]-x,p[1]-z)<=1),`Route point unreachable: ${name}`);
+}
+for(const id of commerce.World.StoreIds) {
+ const yaw=commerce.World.Stores[id].YawDegrees;
+ assert(yaw===0 || yaw===180,`Unexpected non-rigid store orientation: ${id}`);
+}
+// Ground-based PickCargo checks the rendered item, including each cargo offset.
+const server=fs.readFileSync(path.join(project,'src/server/Modules/WorldAdapter.luau'),'utf8');
+const service=fs.readFileSync(path.join(project,'src/server/Modules/CommerceService.luau'),'utf8');
+assert(service.includes('local target={StoreId=c.StoreId,ItemId=item.ItemId}'));
+assert(service.includes('s.Orders[item.OrderId].State~="Docked"'));
+assert(server.includes('if target.ItemId then part=self.itemParts[target.ItemId]'));
+assert(server.includes('truck.cargo.CFrame*CFrame.new((i%2)*1.8-0.9,-0.9,math.floor(i/2)*1.8-0.9)'));
+assert(server.includes('local exclude={self.runtime}') && server.includes('ray.RespectCanCollide=true'));
+assert.equal(commerce.Interaction.Distance,10);
+// Example root height is a model assumption, not an R6/R15 measurement.
+const rootPoint=[23,3.16,-32];
+assert(reachable.has(key(23,-32)));
+// Truck.pose rotates the local cargo frame -90° around Y at Dock; order limit is four.
+const cargoPoints=Array.from({length:commerce.Wholesale.MaxUnitsPerOrder},(_,i)=>{
+ const localX=(i%2)*1.8-0.9, localZ=Math.floor(i/2)*1.8-0.9;
+ return [23-localZ,3.1,-39+localX];
+});
+for(const p of cargoPoints) assert(Math.hypot(...rootPoint.map((v,i)=>v-p[i])) < commerce.Interaction.Distance,`Cargo item too far: ${p}`);
+function segmentHitsBox(a,b,box) {
+ let lo=0,hi=1;
+ for(let k=0;k<3;k++) {
+  const min=box.pos[k]-box.size[k]/2,max=box.pos[k]+box.size[k]/2,d=b[k]-a[k];
+  if(Math.abs(d)<1e-9) { if(a[k]<min || a[k]>max) return false; }
+  else { let t1=(min-a[k])/d,t2=(max-a[k])/d; if(t1>t2) [t1,t2]=[t2,t1]; lo=Math.max(lo,t1);hi=Math.min(hi,t2);if(lo>hi) return false; }
+ }
+ return true;
+}
+const rayObstacles=boxes.filter(b=>b.solid && b.name!=='Spawn');
+for(const p of cargoPoints) assert(!rayObstacles.some(b=>segmentHitsBox(rootPoint,p,b)), `Cargo item ray blocked: ${p}`);
+console.log(`Ground cargo rays: assumed root ${rootPoint} -> ${cargoPoints.length} rendered item centers within 10; inspected store solids clear; runtime excluded by server ray.`);
 // Truck sweep: eight-stud width, including both endpoints, must avoid all solid architecture.
 for(let x=-36;x<=36;x++) assert(!blocked(x,-39,4),`Truck route obstructed at ${x}`);
 // Continuous road-facing apron joins the ten-stud public sidewalk; rear lanes are twelve wide.
@@ -128,7 +202,7 @@ for(const token of ['WaitForChild','task.wait','ClearAllChildren','InsertService
 assert(source.includes('marker:SetAttribute("StoreId", storeId)'));
 assert(source.includes('light:SetAttribute("OutageControlled", true)'));
 assert(source.indexOf('root.Parent = parent')>source.indexOf('checkBudget(root, config)'));
-const report={kind:'OFFLINE_STATIC_INSPECTION_NOT_ROBLOX_EXECUTION', compiler:'Luau 0.745 --null', compile:'PASS', storeCount:8, inspectedStoreBoxes:boxes.length, reachableMarkers, routeWidthStuds:6, truckWidthStuds:8, rearAndSideRoutes:'PASS', spawnEntryClearance:'PASS', hubRoadSeam:'PASS', duplicateConfigNames:'PASS', forbiddenOperations:'PASS', counts:'Runtime checkBudget enforces C.Budget; actual Instance census and 16-player performance remain unverified.'};
+const report={kind:'OFFLINE_STATIC_INSPECTION_NOT_ROBLOX_EXECUTION', compiler:'Luau 0.745 --null', compile:'PASS', storeCount:8, inspectedStoreBoxes:boxes.length, reachableMarkers, routeWidthStuds:6, truckWidthStuds:8, rearAndSideRoutes:'PASS', spawnEntryClearance:'PASS', hubRoadSeam:'PASS', duplicateConfigNames:'PASS', forbiddenOperations:'PASS', partCensus:{perStore,common,world:perStore*8+common,advertising:28,worldWithAds:perStore*8+common+28,limits:commerce.Budget}, counts:'AST/config-derived generation count; actual Roblox Instance census and runtime trucks/items unverified.'};
 const out=path.join(__dirname,'.validation','static-report.json');
 fs.mkdirSync(path.dirname(out),{recursive:true}); fs.writeFileSync(out,JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));

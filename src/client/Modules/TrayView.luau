@@ -31,7 +31,7 @@ end
 
 function TrayView.text(slot: any, products: any): string
 	local product: any = slot.ProductId and products[slot.ProductId]
-	local item = if product then tostring(product.Glyph) .. " " .. tostring(product.Name) else "— 상품 없음"
+	local item = if product then tostring(product.Glyph or "") .. " " .. tostring(product.Name) else "— 상품 없음"
 	local labels: {[string]: string} = {
 		Empty="빈칸", Uncollected="빈칸 · 미수집", Carried="빈칸 · 운반 중",
 		Tray="계산대 대기", Accepted="접수 완료", Cancelled="취소 · 빈칸",

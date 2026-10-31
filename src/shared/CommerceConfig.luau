@@ -1,10 +1,10 @@
 --!strict
--- Commerce contract 1.0.0. Public, read-only design defaults; not live state.
+-- Commerce contract 2.0.0. Public, read-only design defaults; not live state.
 -- Prices, cadence and limits are hypotheses pending Studio/player testing.
 local CommerceConfig = {
-	ContractVersion = "1.0.0",
-	ProtocolVersion = 1, -- Separate Commerce* remote namespace, not legacy Action v1.
-	SchemaVersion = 1,
+	ContractVersion = "2.0.0",
+	ProtocolVersion = 2, -- Breaking solo-owner contract; never accept v1 writes.
+	SchemaVersion = 2,
 	Paths = {
 		Config = "ReplicatedStorage.NightShift.Shared.CommerceConfig",
 		Remotes = "ReplicatedStorage.NightShift.Remotes",
@@ -20,10 +20,11 @@ local CommerceConfig = {
 		Remotes = { Action = "CommerceAction", ActionResult = "CommerceActionResult", State = "CommerceState", GetSnapshot = "GetCommerceSnapshot" },
 		StateInterval = 0.2, TimerSyncInterval = 1, SnapshotCooldown = 2,
 		ActionRate = 10, ActionBurst = 20, RequestCacheSize = 128,
-		MaxRequestId = 2147483647, MaxStringBytes = 96, MaxPayloadFields = 4,
+		MaxRequestId = 2147483647, MaxStringBytes = 96, MaxPayloadFields = 5,
 		MaxSnapshotItems = 256, NearbyDistance = 64, BootstrapTimeout = 10,
 	},
-	Capacity = { TargetPlayers = 16, StoreCount = 8, SeatsPerStore = 4 },
+	Capacity = { TargetPlayers = 8, StoreCount = 8, SeatsPerStore = 1 },
+	Ownership = { AutoAssign = true, EmployeesEnabled = false, MaxStoresPerUser = 1 },
 	World = {
 		LayoutVersion = 2, Name = "NightShiftWorld", OwnerAttribute = "NightShiftOwned",
 		StoreSize = { 56, 18, 48 }, RoadWidth = 24, RoadLength = 400, SidewalkWidth = 10,
@@ -80,22 +81,44 @@ local CommerceConfig = {
 		MaxUnitsPerOrder = 4, MaxUnitsPerStorePerCycle = 8, MaxRareUnitsPerStorePerCycle = 1,
 		MaxOpenOrdersPerStore = 2, MaxItemsPerStore = 24, ReservationSeconds = 5,
 	},
-	Economy = { InitialOperatingCash = 240, InitialWallet = 0, MaxCurrency = 1000000000, RestockSupportCash = 40 },
+	-- InitialOperatingCash remains zero only to fail closed in unported v1 code.
+	Economy = { InitialOperatingCash = 0, InitialWallet = 240, MaxCurrency = 1000000000, RestockSupportCash = 0 },
 	Delivery = { TravelSeconds = 12, DockSeconds = 75, ExitSeconds = 3, MaxTrucksPerStore = 1 },
 	Interaction = { Distance = 10, MaxCarry = 1, MaxCarryWithCart = 2, MaxSpeed = 28, MovementSlack = 4, RecoveryGraceSeconds = 2 },
-	Theft = { HoldSeconds = 2, VictimCooldownSeconds = 60, RecoverSeconds = 25, AlarmSeconds = 12, MaxCarry = 1 },
+	Theft = { HoldSeconds = 2, VictimCooldownSeconds = 60, RecoverSeconds = 25, AlarmSeconds = 12, MaxCarry = 1,
+		NewOwnerProtectionSeconds = 180, PreserveOwner = true, SecureTransferEnabled = false },
+	NPC = { RichProbability = 0.03, NormalMaxUnits = 1, RichMaxUnits = 4,
+		VisitMinSeconds = 12, VisitMaxSeconds = 24, SelectionLeaseSeconds = 10, MaxActivePerStore = 2 },
+	Upgrades = { Warehouse = { MaxLevel = 1, Prices = { 120 }, Capacities = { [0] = 24, [1] = 32 } } },
+	Demand = { PrepareSeconds = 30, ActiveSeconds = 300, ReserveSeconds = 120,
+		UnitsPerSku = 2, SkuCount = 2, Rotation = { { "Water", "Bread" }, { "Milk", "Snack" } },
+		RewardCoins = 0 },
+	Contest = { MaxParticipants = 8, OrderUnits = 4, ShelfSlots = { "Slot01", "Slot02" },
+		Tool = "HandCarry", OpportunityCount = 4, OpportunityOffsets = { 90, 140, 190, 240 },
+		OpportunityToleranceSeconds = 5, DeliverySeconds = 12,
+		DiversityPerSku = 10, DiversityMax = 20, PlanPerUnit = 10, PlanMax = 40,
+		LogisticsPerUnit = 10, LogisticsMax = 30, RewardCoins = 0, OverallWinner = false },
+	Traffic = { MarkerRoot = "Traffic", PathRoot = "PedestrianPaths", LayoutVersion = 1,
+		VehicleGreenSeconds = 20, AllRedSeconds = 3, WalkSeconds = 12,
+		CollisionCooldownSeconds = 2, MinCollisionSpeed = 2, MaxCollisionDistance = 8,
+		DropLifetimeSeconds = 25, MaxVehicles = 2,
+		Phases = { "VehicleGreen", "AllRedToWalk", "Walk", "AllRedToVehicle" },
+		VehicleRoute = { "VehicleSpawn", "VehicleStop", "VehicleCrossExit", "VehicleExit" },
+		PedestrianRoute = { "SidewalkSpawn", "CrossingWait", "CrossingEntry", "CrossingExit", "StoreApproach", "Entry", "Browse", "Checkout", "StoreExit", "SidewalkExit" } },
 	Progression = {
 		LevelXP = { 0, 40, 100, 180, 300 },
 		Tools = { HandCarry = 1, Handcart = 2, StockScanner = 3, LayoutPreset = 4, ToolStyle = 5 },
-		Rewards = { Delivery = { XP = 2, Coins = 0 }, Sale = { XP = 5, Coins = 2 }, CoopClose = { XP = 10, Coins = 5 } },
+		Rewards = { Delivery = { XP = 2, Coins = 0 }, Sale = { XP = 5, Coins = 0 }, CoopClose = { XP = 10, Coins = 0 } },
 		MaxXP = 1000000000, FreePresetSlots = 2, MaxPresetSlots = 6,
 	},
 	Profile = {
 		DataStoreName = "NightShiftProfiles_v1", KeyPrefix = "u:", DefaultMode = "Memory",
 		AutosaveSeconds = 30, LeaseSeconds = 120, RenewSeconds = 30, FreezeBeforeExpirySeconds = 15,
 		MaxAttempts = 3, RetrySeconds = { 1, 2 }, CloseBudgetSeconds = 20, MaxCosmetics = 64,
+		MaxOwnedItems = 128, MaxDisplayNameBytes = 96, LegacyMaxTeamSize = 4,
+		RestorePolicy = "OncePerEpoch", TransitSettlement = "DeliverPaidToOwner",
 	},
-	Ranking = { MaxRows = 16, MaxBestRecords = 320, WeeklyEnabled = false, ModeTags = { "Coop", "Solo", "Support", "Practice" } },
+	Ranking = { MaxRows = 8, MaxBestRecords = 320, WeeklyEnabled = false, ModeTags = { "Solo", "Practice" } },
 	Voice = { Mode = "RobloxProximity", ForceMicrophone = false, Record = false, Transcribe = false },
 	Monetization = {
 		Enabled = false,
@@ -103,7 +126,7 @@ local CommerceConfig = {
 		ProductIds = {}, RobuxPrices = {},
 	},
 	Enums = {
-		ItemState = { "Truck", "Warehouse", "Carried", "Shelf", "TheftCarried", "Recoverable", "Sold", "Recalled", "Expired" },
+		ItemState = { "Truck", "Warehouse", "Carried", "Shelf", "TheftCarried", "Recoverable", "SafeStorage", "Sold", "Recalled", "Expired" },
 		OrderState = { "Reserved", "InTransit", "Docked", "Completed", "Cancelled", "Recalled" },
 		DeliveryEventKind = { "Dispatched", "Arrived", "Recall", "Failed", "Cancelled" },
 		ProfileState = { "Loading", "Ready", "Temporary", "LoadFailed", "Locked", "Saving", "SaveFailed", "LeaseLost", "Released" },
@@ -111,7 +134,8 @@ local CommerceConfig = {
 	},
 	Actions = {
 		"OrderStock", "CancelStockOrder", "PickCargo", "PickWarehouse", "PickShelf", "PlaceShelf", "DropWarehouse",
-		"BeginTheft", "CancelTheft", "RecoverItem", "SecureTheft", "EquipTool", "SavePreset", "ApplyPreset",
+		"BeginTheft", "CancelTheft", "RecoverItem", "EquipTool", "SavePreset", "ApplyPreset",
+		"BuyUpgrade", "SetContestParticipation", "RequestRecoveryStock",
 	},
 	ErrorCodes = {
 		"OK", "BAD_REQUEST", "VERSION_MISMATCH", "RATE_LIMIT", "NOT_READY", "INTERNAL_ERROR",
@@ -121,13 +145,16 @@ local CommerceConfig = {
 		"STALE_ITEM", "BAD_TOKEN", "CARRY_FULL", "SLOT_FULL", "SKU_MISMATCH", "COOLDOWN", "PROTECTED",
 		"DELIVERY_FAILED", "PROFILE_UNAVAILABLE", "SAVE_FAILED", "SESSION_LOCKED", "LEASE_LOST",
 		"SCHEMA_UNSUPPORTED", "PROFILE_CORRUPT", "LEVEL_LOCKED", "PRESET_INVALID", "FEATURE_DISABLED",
+		"STORE_FULL", "ALREADY_OWNER", "STALE_OWNER", "STALE_PROFILE", "PROFILE_FROZEN", "RESTORE_FAILED",
+		"STALE_UPGRADE", "UPGRADE_MAX", "STALE_ACTIVITY", "NEXT_CYCLE", "SUPPLY_UNAVAILABLE",
+		"INVALID_NPC", "STALE_SELECTION", "DUPLICATE_TRANSACTION", "INVALID_COLLISION", "CURRENCY_CAP",
 	},
 	Budget = { StoreParts = 180, CommonParts = 400, TotalParts = 1840, StoreLights = 4, CommonLights = 8, TotalLights = 40 },
 	Text = {
 		Temporary = "Studio 임시 데이터 · 종료 시 저장되지 않음",
 		SavePending = "저장 대기", SaveFailed = "저장 실패 · 마지막 저장 이후 진행은 복구되지 않을 수 있음",
 		LoadFailed = "데이터를 불러오지 못했습니다. 기존 저장은 변경하지 않았습니다.",
-		OperatingCash = "이번 교대 운영자금", Wallet = "개인 게임머니",
+		OperatingCash = "개인 게임머니", Wallet = "개인 게임머니",
 		TheftAlarm = "상품 도난 · 위치를 확인하세요", VoiceFallback = "음성 없이 핑과 화면 안내로 협동할 수 있습니다.",
 	},
 }

@@ -14,9 +14,9 @@ local function remove(list, item)
 	local index = table.find(list, item)
 	if index then table.remove(list, index) end
 end
-function Service.new(config, world)
+function Service.new(config, world, deps)
 	local self = setmetatable({ config = config, world = world, users = {}, stores = {}, serial = 0, summaryRevision = 0,
-		random = Random.new(), ready = false }, Service)
+		commerceDeps = deps, commerce = deps and deps.Commerce, pendingRankings={}, random = Random.new(), ready = false }, Service)
 	for _, id in ipairs(config.World.StoreIds) do
 		local map = world.stores[id]
 		self.stores[id] = { StoreId = id, Revision = 0, RosterVersion = 0, Phase = map.available and "Lobby" or "Unavailable",
@@ -54,6 +54,7 @@ function Service:connect(player)
 	return user
 end
 function Service:characterReady(user)
+ if self.commerce then self:clearCarry(user); self.commerce:depart(user.id) end
 	if not user.player or not self.world:alive(user.player) then return end
 	local store = user.storeId and self.stores[user.storeId]
 	if store and store.Phase == "Recovery" and user.participant == "Reserved" then
@@ -86,7 +87,16 @@ function Service:clearRoles(store)
 	for _, user in pairs(store.seats) do self:releaseRole(user) end
 end
 function Service:clearCarry(user)
-	if not user.carry then return end
+    if self.commerce then
+        local store=user.storeId and self.stores[user.storeId]
+        local order=store and store.round and store.round.order
+        local found=false
+        for _,line in ipairs(order and order.lines or {}) do if line.claimUser==user.id then
+            found=true; line.claimUser=false; line.status="Uncollected"; line.carrier=false; line.token=false; line.tray=false; line.revision+=1
+        end end
+        if found then self.commerce:depart(user.id) end
+    end
+    if not user.carry then return end
 	local store = user.storeId and self.stores[user.storeId]
 	local order = store and store.round and store.round.order
 	local line = order and order.lines[user.carry.LineId]
@@ -98,6 +108,7 @@ function Service:clearCarry(user)
 	self:touchUser(user)
 end
 function Service:dropSeat(user)
+ if self.commerce then self.commerce:depart(user.id) end
 	local store = user.storeId and self.stores[user.storeId]
 	self:clearCarry(user)
 	self:releaseRole(user)
@@ -133,9 +144,19 @@ function Service:newOrder(store, now)
 	local first = self.config.Schedules[round.schedule].FirstProducts[round.success + 1]
 	local products = { first }
 	for _, product in ipairs(self.config.ProductOrder) do if product ~= first then table.insert(products, product) end end
-	local order = { id = self:id("o"), stage = round.success + 1, required = round.target, accepted = 0,
+	if self.commerce then
+        products={}
+        local view=self.commerce:view(self:commerceContext(self.users[round.active[1]]))
+        for _,item in ipairs(view.Store and view.Store.Items or {}) do
+            if item.State=="Shelf" then table.insert(products,item.Sku) end
+        end
+        if #products==0 then round.boundary=false; round.boundaryKind="None"; return end
+        if round.preparing then round.preparing=false; Timer.resume(round.shift,now) end
+    end
+    local required=self.commerce and math.min(round.target,#products) or round.target
+    local order = { id = self:id("o"), stage = round.success + 1, required = required, accepted = 0,
 		timer = Timer.new(self.config.Order.Seconds, now, true), lines = {} }
-	for index = 1, round.target do
+	for index = 1, required do
 		order.lines[index] = { id = index, product = products[index], status = "Uncollected", revision = 0,
 			carrier = false, token = false, tray = false, acceptedBy = false }
 	end
@@ -176,8 +197,19 @@ function Service:startRound(store, solo, now)
 		layout = copy(config.InitialLayouts[layout]), shuffleStatus = "Pending", outageStatus = "Pending", bellShown = false,
 		order = false, outage = false, recovery = false, recoveryBudget = config.Round.RecoveryBudgetSeconds,
 		soloRequest = false, soloUsed = false, hadReduction = false, hadSolo = solo, hadSupport = false }
-	self.world:setOutage(store.StoreId, false)
-	self.world:setLayout(store.StoreId, store.round.layout)
+	if self.commerce then
+        local protected=false
+        for _,id in ipairs(active) do
+            local profile=self.commerceDeps.Profiles:get(id)
+            if not profile.Ok or not profile.Value.CompletedFirstShift then protected=true end
+        end
+        local begun=self.commerce:beginShift(store.StoreId,store.RoundId,{InitialUserIds=copy(active),TeamSize=#active,Mode=solo and "Practice" or "Coop",Protected=protected})
+        assert(begun.Ok,"Commerce beginShift failed: "..begun.Code)
+        store.round.preparing=true; store.round.practice=solo; store.round.toolTier=1
+        store.round.shuffleStatus="Done"; Timer.pause(store.round.shift,now); self:syncCommerce()
+    end
+    self.world:setOutage(store.StoreId, false)
+    self.world:setLayout(store.StoreId, store.round.layout)
 	self:newOrder(store, now)
 	self:touch(store)
 end
@@ -261,8 +293,26 @@ function Service:restoreOutage(store, resolution, now)
 	if not self:checkResult(store, now) then self:boundary(store, now) end
 end
 function Service:finish(store, code, reason, now)
-	local round = store.round
-	if not round then return end
+    local round = store.round
+    if not round then return end
+    if self.commerce then
+        local settled=self.commerce:endShift(store.StoreId,round.id)
+        assert(settled.Ok,"Commerce endShift failed: "..settled.Code)
+        round.hadSupport=round.hadSupport or settled.Value.HadSupport
+        if code=="CoopSuccess" and round.hadSupport then code="SupportClose" end
+        local completed=code=="CoopSuccess" or code=="AdjustedClose" or code=="SupportClose"
+        local mode=round.practice and "Practice" or (round.hadSupport and "Support" or (round.hadSolo and "Solo" or "Coop"))
+        local record={TransactionId="rank:"..round.id,StoreId=store.StoreId,RoundId=round.id,UserId=false,
+            Sales=settled.Value.Sales,Revenue=settled.Value.Revenue,TeamSize=#round.initial,ToolTier=round.toolTier,
+            Mode=mode,HadSupport=round.hadSupport,HadReduction=round.hadReduction,FinishedAt=now,InitialUserIds=copy(round.initial),Completed=completed}
+        if not self.commerceDeps.Ranking:record(record).Ok then self.pendingRankings[round.id]=record end
+        if completed and mode=="Coop" then
+            for _,id in ipairs(round.initial) do
+                local status=self.commerceDeps.Profiles:status(id)
+                self.commerceDeps.Progression:award(id,{TransactionId="close:"..round.id,Epoch=status.Epoch,Kind="CoopClose",Sku=false,Eligible=true})
+            end
+        end
+    end
 	local result = { StoreId = store.StoreId, RoundId = round.id, Code = code, FailureReason = reason or false,
 		SuccessCount = round.success, OutageResolution = round.outage and round.outage.resolution or false,
 		HadReduction = round.hadReduction, HadSolo = round.hadSolo, HadSupport = round.hadSupport, FinishedAt = now }
@@ -304,7 +354,7 @@ function Service:reduce(store, now)
 	round.target = math.max(1, #round.active - 1)
 	local order = round.order
 	if order then
-		order.required = math.max(order.accepted, round.target)
+		order.required = math.max(order.accepted, math.min(order.required, round.target))
 		local pending = {}
 		local priority = { Tray = 1, Carried = 2, Uncollected = 3 }
 		for _, line in ipairs(order.lines) do if priority[line.status] then table.insert(pending, line) end end
@@ -313,7 +363,7 @@ function Service:reduce(store, now)
 		end)
 		for index = order.required - order.accepted + 1, #pending do
 			local line = pending[index]
-			if line.carrier then self:clearCarry(self.users[line.carrier]) end
+			if line.claimUser then self:clearCarry(self.users[line.claimUser]) elseif line.carrier then self:clearCarry(self.users[line.carrier]) end
 			line.status, line.carrier, line.token, line.tray = "Cancelled", false, false, false
 			line.revision += 1
 		end
@@ -329,7 +379,7 @@ function Service:pauseRound(round, now)
 	if round.outage then Timer.pause(round.outage.timer, now) end
 end
 function Service:resumeTimers(round, now)
-	Timer.resume(round.shift, now)
+	if not round.preparing then Timer.resume(round.shift, now) end
 	local dark = round.outage and round.outage.status == "Active"
 	if dark then Timer.resume(round.outage.timer, now)
 	else
@@ -393,6 +443,7 @@ function Service:resumeCoop(store, now)
 end
 -- Called for every departure in a same-timestamp batch BEFORE tick/deadlines/reduction.
 function Service:depart(user, reason, context)
+ if self.commerce then self:clearCarry(user); self.commerce:depart(user.id) end
 	local store = user.storeId and self.stores[user.storeId]
 	if reason == "Disconnect" then user.player = nil end
 	user.loaded, user.ready, user.resumeReady = false, false, false
@@ -512,7 +563,11 @@ function Service:tickStore(store, now)
 	for index = #store.signals, 1, -1 do
 		if store.signals[index].ExpiresAt <= now then table.remove(store.signals, index); self:touch(store) end
 	end
-	if store.Phase == "Starting" and Timer.expired(store.startTimer, now) then self:startRound(store, false, store.startTimer.due) end
+	if store.Phase == "Starting" and Timer.expired(store.startTimer, now) then
+        local allowed=true
+        if self.commerce then for _,member in pairs(store.seats) do if member.profileReady==false or self.commerceDeps.Profiles:status(member.id).Frozen then allowed=false end end end
+        if allowed then self:startRound(store,false,store.startTimer.due) else self:rosterChanged(store) end
+    end
 	if store.Phase == "Result" then if Timer.expired(store.resultTimer, now) then self:toLobby(store) end; return end
 	local round = store.round
 	if not round then return end
@@ -574,8 +629,16 @@ function Service:tickStore(store, now)
 		end
 	end
 end
-function Service:tick(now)
-	for _, id in ipairs(self.config.World.StoreIds) do self:tickStore(self.stores[id], now) end
+function Service:tickCommerce(now)
+    self:syncCommerce(); self.commerce:tick(now)
+    for _,store in pairs(self.stores) do local round=store.round
+        if round and store.Phase=="Running" and not round.order and not round.boundary and not (round.outage and round.outage.status=="Active") then self:newOrder(store,now) end
+    end
+    for id,record in pairs(self.pendingRankings) do if self.commerceDeps.Ranking:record(record).Ok then self.pendingRankings[id]=nil end end
+end
+function Service:tick(now,deferCommerce)
+    for _, id in ipairs(self.config.World.StoreIds) do self:tickStore(self.stores[id], now) end
+    if self.commerce and not deferCommerce then self:tickCommerce(now) end
 end
 function Service:nextDeadline()
 	local earliest = math.huge
@@ -598,7 +661,7 @@ function Service:nextDeadline()
 	end
 	return earliest
 end
-function Service:action(user, request, now)
+function Service:legacyAction(user, request, now)
 	local action, payload = request.Action, request.Payload
 	-- A late unload report from the just-finished Starting state can only revoke this user's input.
 	-- It cannot restore permission, move a seat or affect another user's role.
@@ -644,6 +707,7 @@ function Service:action(user, request, now)
 	elseif action == "TravelToEntry" or action == "Reposition" then
 		if now - user.moveAt < self.config.Interaction.RepositionCooldown then return "COOLDOWN", false, self.config.Interaction.RepositionCooldown - (now - user.moveAt) end
 		user.moveAt = now
+        if self.commerce then self:clearCarry(user); self.commerce:depart(user.id) end
 		self:releaseRole(user)
 		local moved = self.world:move(user.player, store.StoreId, action == "Reposition" and "Spawn" or "Entry")
 		return moved and "OK" or "MOVE_FAILED", moved and "OK" or "MOVE_FAILED"
@@ -672,7 +736,7 @@ function Service:action(user, request, now)
 				local count, allReady = 0, true
 				for _, member in pairs(store.seats) do
 					count += 1
-					if not member.player or not member.ready or not member.loaded or not self.world:alive(member.player) then allReady = false end
+					if not member.player or not member.ready or not member.loaded or not self.world:alive(member.player) or (self.commerce and (member.profileReady==false or self.commerceDeps.Profiles:status(member.id).Frozen)) then allReady = false end
 				end
 				if count >= self.config.Capacity.MinCoopPlayers and allReady and store.Phase == "Lobby" then
 					store.Phase, store.startTimer = "Starting", Timer.new(self.config.Round.StartConfirmSeconds, now, true)
@@ -748,9 +812,24 @@ function Service:itemAction(user, store, request, now)
 		if user.carry then return "CARRY_FULL" end
 		if line.status ~= "Uncollected" then return "INVALID_STATE" end
 		local shelf = tonumber(string.sub(payload.Shelf, -1))
-		if round.layout[shelf] ~= line.product then return "BAD_REQUEST" end
-		if not self.world:near(user.player, store.StoreId, payload.Shelf) then return "TOO_FAR" end
-		line.status, line.carrier, line.token = "Carried", user.id, self:id("c")
+		local token
+        if self.commerce then
+            local view=self.commerce:view(self:commerceContext(user)); local candidate
+            for _,item in ipairs(view.Store and view.Store.Items or {}) do
+                local slot=item.SlotId and tonumber(string.sub(item.SlotId,5))
+                if item.State=="Shelf" and item.Sku==line.product and slot and math.ceil(slot/4)==shelf
+                    and (not candidate or item.ItemId<candidate.ItemId) then candidate=item end
+            end
+            if not candidate then return "OUT_OF_STOCK" end
+            local claim=self.commerce:claimForLine(self:commerceContext(user),candidate.ItemId,candidate.Revision,order.id..":"..line.id)
+            if not claim.Ok then return claim.Code end
+            token=claim.Value.CarryToken; line.claimUser=user.id; line.itemId=candidate.ItemId
+        else
+            if round.layout[shelf] ~= line.product then return "BAD_REQUEST" end
+            if not self.world:near(user.player, store.StoreId, payload.Shelf) then return "TOO_FAR" end
+            token=self:id("c")
+        end
+        line.status, line.carrier, line.token = "Carried", user.id, token
 		line.revision += 1
 		user.carry = { RoundId = round.id, OrderId = order.id, LineId = line.id, LineRevision = line.revision,
 			ProductId = line.product, CarryToken = line.token }
@@ -759,7 +838,16 @@ function Service:itemAction(user, store, request, now)
 		if line.status ~= "Carried" or line.carrier ~= user.id or not user.carry or line.token ~= payload.CarryToken
 			or user.carry.CarryToken ~= payload.CarryToken then return "BAD_TOKEN" end
 		if action == "PutDown" and not self.world:near(user.player, store.StoreId, "Counter") then return "TOO_FAR" end
-		line.status, line.carrier, line.token = action == "PutDown" and "Tray" or "Uncollected", false, false
+		if self.commerce then
+            local check=self.world:check(self:commerceContext(user),{StoreId=store.StoreId,Marker=action=="PutDown" and "Counter" or "WarehouseDrop"})
+            if not check.Ok then return check.Code end
+            if action=="ReturnItem" then
+                local returned=self.commerce:returnLine(self:commerceContext(user),order.id..":"..line.id)
+                if not returned.Ok then return returned.Code end
+                line.claimUser=false
+            end
+        end
+        line.status, line.carrier, line.token = action == "PutDown" and "Tray" or "Uncollected", false, false
 		line.tray = action == "PutDown" and line.id or false
 		line.revision += 1
 		user.carry = false
@@ -767,7 +855,12 @@ function Service:itemAction(user, store, request, now)
 	else
 		if line.status ~= "Tray" then return "INVALID_STATE" end
 		if not self.world:near(user.player, store.StoreId, "Counter") then return "TOO_FAR" end
-		line.status, line.tray, line.acceptedBy = "Accepted", false, user.id
+		if self.commerce then
+            local sold=self.commerce:sellLine(self:commerceContext(user),order.id..":"..line.id,"sale:"..order.id..":"..line.id)
+            if not sold.Ok then return sold.Code end
+            line.claimUser=false
+        end
+        line.status, line.tray, line.acceptedBy = "Accepted", false, user.id
 		line.revision += 1
 		order.accepted += 1
 		self:completeOrder(store, now)
@@ -854,7 +947,7 @@ function Service:storeState(store, user, now)
 		ShiftTimer = Timer.wire(r.shift, now), BoundaryTimer = Timer.wire(r.boundary, now), BoundaryKind = r.boundaryKind,
 		ShelfProducts = copy(r.layout), ShuffleStatus = r.shuffleStatus, OutageStatus = r.outageStatus, BellShown = r.bellShown,
 		Order = false, Outage = false, Recovery = false, SoloRequest = false, SoloRequestUsed = r.soloUsed,
-		HadReduction = r.hadReduction, HadSolo = r.hadSolo, HadSupport = r.hadSupport }
+		HadReduction = r.hadReduction, HadSolo = r.hadSolo, HadSupport = r.hadSupport, Preparing = r.preparing == true }
 	if r.order then
 		local order = r.order
 		local lines = {}
@@ -921,5 +1014,98 @@ function Service:ack(user, requestId, code, moveCode, retry)
 	return { ProtocolVersion = self.config.ProtocolVersion, RequestId = requestId, Ok = code == "OK", Code = code,
 		StoreId = user.storeId, RoundId = store and store.RoundId or false, Revision = store and store.Revision or 0,
 		RetryAfter = retry or 0, MoveCode = moveCode or false }
+end
+-- Compose a private runtime config without mutating either shared module.
+function Service.runtimeConfig(legacy,c)
+ local config=copy(legacy)
+ for k,v in pairs(c.Capacity) do config.Capacity[k]=copy(v) end
+ for k,v in pairs(c.World) do if k~="MarkerOrder" and k~="Markers" then config.World[k]=copy(v) end end
+ config.Budget=copy(c.Budget)
+ for sku,p in pairs(c.Products) do if not config.Products[sku] then config.Products[sku]={Name=p.Name,Glyph=p.Rarity=="Rare" and "★" or "●",Shape="Circle"} end end
+ config.ProductOrder=copy(c.ProductOrder); return config
+end
+function Service:commerceContext(user)
+ local deps=self.commerceDeps
+ if not user then return {UserId=0,StoreId=false,RoundId=false,SeatGeneration=0,Loaded=false,Active=false,Mode="Practice",OnlineCount=0,ToolId="HandCarry",ProfileEpoch=0} end
+ local store=user.storeId and self.stores[user.storeId]; local round=store and store.round
+ local status=deps.Profiles:status(user.id); local p=deps.Progression:view(user.id)
+ local active=store and self:active(user,store,false)=="OK" and not status.Frozen and user.profileReady~=false
+ return {UserId=user.id,StoreId=user.storeId,RoundId=store and store.RoundId or false,SeatGeneration=user.generation,
+  Loaded=user.loaded and not status.Frozen and user.profileReady~=false,Active=active==true,Mode=round and (round.practice and "Practice" or round.mode) or "Practice",
+  OnlineCount=round and #round.active or 0,ToolId=p.EquippedTool,ProfileEpoch=status.Epoch}
+end
+function Service:syncCommerce()
+ for _,user in pairs(self.users) do
+  if user.player then
+   local c=self:commerceContext(user); self.commerce:syncContext(c)
+   local store=user.storeId and self.stores[user.storeId]
+   if store and store.round and user.participant=="Active" then
+    store.round.toolTier=math.max(store.round.toolTier or 1,self.commerceDeps.Config.Progression.Tools[c.ToolId] or 1)
+   end
+  else self.commerce:depart(user.id) end
+ end
+end
+function Service:hasLineClaim(user)
+ local store=user.storeId and self.stores[user.storeId]; local order=store and store.round and store.round.order
+ for _,line in ipairs(order and order.lines or {}) do if line.claimUser==user.id then return true end end
+ return user.carry~=false
+end
+function Service:action(user,request,now)
+ if self.commerce then
+  self:syncCommerce()
+  if request.Action=="SetReady" or request.Action=="SoloPractice" then
+   if self.commerceDeps.Profiles:status(user.id).Frozen or user.profileReady==false then return "PROFILE_UNAVAILABLE" end
+  end
+  if request.Action=="PickUp" and self:hasLineClaim(user) then return "CARRY_FULL" end
+ end
+ local code,move,retry=self:legacyAction(user,request,now)
+ if self.commerce then self:syncCommerce() end
+ return code,move,retry
+end
+function Service:commerceAction(user,request)
+ local code=self:membership(user,request)
+ if code~="OK" then return {Ok=false,Code=code,Value=false} end
+ self:syncCommerce()
+ local c=self:commerceContext(user)
+ if not c.Loaded or not c.Active then return {Ok=false,Code=not c.Loaded and "NOT_LOADED" or "NOT_ACTIVE",Value=false} end
+ local deps=self.commerceDeps; local action=request.Action; local p=request.Payload
+ if self:hasLineClaim(user) and (action=="EquipTool" or action=="PickCargo" or action=="PickWarehouse" or action=="PickShelf" or action=="BeginTheft") then return {Ok=false,Code="CARRY_FULL",Value=false} end
+ local answer
+ if action=="EquipTool" then
+  local v=self.commerce:view(c)
+  if #v.Carry>0 or (v.Theft and v.Theft.State=="Holding") then return {Ok=false,Code="CARRY_FULL",Value=false} end
+  answer=deps.Progression:equip(user.id,p.ToolId)
+ elseif action=="SavePreset" then
+  local check=self.world:check(c,{StoreId=c.StoreId,Marker="OfficePC"}); if not check.Ok then return check end
+  answer=deps.Progression:savePreset(user.id,p.Index,p.Slots)
+ else answer=self.commerce:action(c,action,p) end
+ self:syncCommerce(); return answer
+end
+function Service:commercePacket(user,connection,now,full)
+ local deps=self.commerceDeps; local c=self:commerceContext(user); local view=self.commerce:view(c)
+ local own=deps.Progression:view(user.id); local status=deps.Profiles:status(user.id)
+ own.ProfileState=status.State; own.SaveMode=status.Mode; own.Dirty=status.Dirty; own.SavedRevision=status.SavedRevision
+ own.Carry=view.Carry; own.Theft=view.Theft; own.Voice="PlatformManaged"
+ local slices={Self=own,Wholesale=view.Wholesale,Stores=view.Stores,Store=view.Store,Nearby=view.Nearby,Rankings=deps.Ranking:view()}
+ local function same(a,b)
+  if type(a)~=type(b) then return false end
+  if type(a)~="table" then return a==b end
+  for k,v in pairs(a) do if not same(v,b[k]) then return false end end
+  for k in pairs(b) do if a[k]==nil then return false end end
+  return true
+ end
+ local packet={ProtocolVersion=1,Kind=full and "Snapshot" or "Delta",ServerTime=now}
+ local changed=false
+ for key,value in pairs(slices) do if full or not connection.slices or not same(value,connection.slices[key]) then packet[key]=value; changed=true end end
+ connection.lastSend=now
+ if not changed and now-connection.lastTimer<deps.Config.Network.TimerSyncInterval then return nil end
+ connection.sequence+=1; connection.lastTimer=now; connection.slices=copy(slices); packet.Sequence=connection.sequence
+ return packet
+end
+function Service:commerceAck(user,id,code,value,retry)
+ local c=self:commerceContext(user); local v=self.commerce:view(c)
+ return {ProtocolVersion=1,RequestId=id,Ok=code=="OK",Code=code,RetryAfter=retry or 0,
+  StoreId=c.StoreId,RoundId=c.RoundId,Revision=v.Store and v.Store.Revision or 0,
+  EntityId=type(value)=="table" and (value.OrderId or value.TheftId or value.ItemId) or false}
 end
 return Service

@@ -1,10 +1,10 @@
 --!strict
--- Contract v1; numbers are unverified design targets, not play-test results.
+-- Contract v2; numbers are unverified design targets, not play-test results.
 -- Public constants only. Never store a round's answer, carry token or live state here.
 local Config = {
-	ProtocolVersion = 1,
-	ContractVersion = "1.0.0",
-	DesignVersion = "scale-plan v0.3.2",
+	ProtocolVersion = 2,
+	ContractVersion = "2.0.0",
+	DesignVersion = "solo-store RC",
 	Namespace = "NightShift",
 	Paths = {
 		Config = "ReplicatedStorage.NightShift.Shared.Config",
@@ -38,7 +38,7 @@ local Config = {
 		MaxPayloadFields = 4,
 		BootstrapTimeout = 10,
 	},
-	Capacity = { TargetPlayers = 16, StoreCount = 4, SeatsPerStore = 4, MinCoopPlayers = 2 },
+	Capacity = { TargetPlayers = 8, StoreCount = 8, SeatsPerStore = 1, MinCoopPlayers = 1 },
 	Round = {
 		SuccessOrders = 5, MaxSeconds = 300, StartConfirmSeconds = 3,
 		RecoveryBudgetSeconds = 20, SoloRequestSeconds = 10,
@@ -77,12 +77,16 @@ local Config = {
 		Name = "NightShiftWorld", HubName = "Hub", StoresName = "Stores", OwnerAttribute = "NightShiftOwned",
 		HubSize = { 64, 1, 64 }, HubSpawn = { 0, 0.5, 0 }, HubStoreSelect = { 0, 3, -12 },
 		RoadWidth = 18, StoreSize = { 56, 18, 48 }, SpawnLift = 4,
-		StoreIds = { "Store01", "Store02", "Store03", "Store04" },
+		StoreIds = { "Store01", "Store02", "Store03", "Store04", "Store05", "Store06", "Store07", "Store08" },
 		Stores = {
-			Store01 = { Name = "01 달빛점", Shape = "○", Position = { 0, 0, -140 }, YawDegrees = 0 },
-			Store02 = { Name = "02 골목점", Shape = "△", Position = { 140, 0, 0 }, YawDegrees = -90 },
-			Store03 = { Name = "03 새벽점", Shape = "□", Position = { 0, 0, 140 }, YawDegrees = 180 },
-			Store04 = { Name = "04 별빛점", Shape = "◇", Position = { -140, 0, 0 }, YawDegrees = 90 },
+			Store01 = { Name = "01 달빛점", Shape = "○", Position = { -120, 0, -52 }, YawDegrees = 0 },
+			Store02 = { Name = "02 골목점", Shape = "△", Position = { -40, 0, -52 }, YawDegrees = 0 },
+			Store03 = { Name = "03 새벽점", Shape = "□", Position = { 40, 0, -52 }, YawDegrees = 0 },
+			Store04 = { Name = "04 별빛점", Shape = "◇", Position = { 120, 0, -52 }, YawDegrees = 0 },
+			Store05 = { Name = "05 은하점", Shape = "○", Position = { -120, 0, 52 }, YawDegrees = 180 },
+			Store06 = { Name = "06 노을점", Shape = "△", Position = { -40, 0, 52 }, YawDegrees = 180 },
+			Store07 = { Name = "07 바람점", Shape = "□", Position = { 40, 0, 52 }, YawDegrees = 180 },
+			Store08 = { Name = "08 가로등점", Shape = "◇", Position = { 120, 0, 52 }, YawDegrees = 180 },
 		},
 		MarkerOrder = { "Counter", "Shelf1", "Shelf2", "Shelf3", "SignalPanel", "Breaker", "Entry", "Spawn" },
 		Markers = {
@@ -103,15 +107,15 @@ local Config = {
 		Participant = { "Hub", "Active", "Waiting", "Returning", "Reserved" },
 		LineStatus = { "Uncollected", "Carried", "Tray", "Accepted", "Cancelled" },
 		EventStatus = { "Pending", "Active", "Done" },
-		OutageResolution = { "Coop", "Support", "Solo" },
-		ResultCode = { "CoopSuccess", "SupportClose", "AdjustedClose", "Incomplete", "Abandoned" },
+		OutageResolution = { "Solo" },
+		ResultCode = { "AdjustedClose", "Incomplete", "Abandoned" },
 		FailureReason = { "Anxiety", "TimeLimit", "SoloLeft", "AllLeft" },
 		InputBlockReason = { "None", "NotActive", "Recovery", "Loading", "MissingOwner", "Unshared", "NotBreakerOwner", "NoOutage" },
 	},
 	Actions = {
-		"JoinStore", "LeaveStore", "TravelToEntry", "Reposition", "SetLoaded", "SetReady", "SoloPractice",
-		"ResumeReady", "FinishSolo", "RequestSolo", "CancelSolo", "AcknowledgeResult",
-		"PickUp", "PutDown", "ReturnItem", "AcceptLine", "ClaimRole", "ReleaseRole", "RenewRole", "ShareSegment", "InputShape", "Signal",
+		"TravelToEntry", "Reposition", "SetLoaded", "SetReady", "SoloPractice",
+		"ResumeReady", "FinishSolo", "AcknowledgeResult",
+		"PickUp", "PutDown", "ReturnItem", "AcceptLine", "InputShape", "Signal",
 	},
 	ErrorCodes = {
 		"OK", "BAD_REQUEST", "VERSION_MISMATCH", "RATE_LIMIT", "STALE_REQUEST", "REQUEST_ID_REUSED",
@@ -121,17 +125,17 @@ local Config = {
 		"NOT_SHARED", "COOLDOWN", "MOVE_FAILED", "REQUEST_IN_PROGRESS", "ALREADY_USED", "INTERNAL_ERROR",
 	},
 	Budget = {
-		StoreParts = 180, CommonParts = 400, TotalParts = 1120,
-		StoreLights = 4, CommonLights = 8, TotalLights = 24, ShadowParts = 80,
+		StoreParts = 180, CommonParts = 400, TotalParts = 1840,
+		StoreLights = 4, CommonLights = 8, TotalLights = 40, ShadowParts = 80,
 		FreePhysicsAssemblies = 0, VisibleGuiObjects = 160,
-		StateBytesPerPlayerSecond = 12000, StateBytesTotalSecond = 192000,
+		StateBytesPerPlayerSecond = 12000, StateBytesTotalSecond = 96000,
 	},
 	Text = {
 		Title = "오늘도 정상영업",
 		Start = "첫 야간이네요. 자리가 달라도 물건은 여기 있어요.",
-		Memo = "주문 5건. 불이 꺼지면 표시판 담당들이 구간을 공유하고, 차단기 담당이 순서를 입력하세요. 필요한 인원은 화면에서 확인해요.",
+		Memo = "내 가게에서 주문하고 진열해 첫 손님을 맞으세요. 정전은 화면 순서를 보고 혼자 복구할 수 있어요.",
 		Outage = "서로 다른 밤이 켜졌어요.",
-		CoopHelp = "각자 빈 역할을 맡으세요. 표시판 담당 전원이 연결해 구간을 공유하면 차단기에서 순서를 입력할 수 있어요.",
+		CoopHelp = "화면 순서를 확인하고 자기 매장 차단기에 입력하세요.",
 		SoloHelp = "혼자 마무리: 표시판 연결 없이 화면 순서를 차단기에 입력하세요.",
 		Recovery = "복귀 대기 · 입력 중지",
 		Loading = "점포 준비 중",

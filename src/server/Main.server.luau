@@ -1,232 +1,258 @@
 --!nonstrict
--- Deploy as ServerScriptService.NightShift.Main (Script).
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
-local RunService = game:GetService("RunService")
-local function clock() return workspace:GetServerTimeNow() end
-local bootstrapDeadline = os.clock() + 10
-local function bounded(parent, name, class)
-	local child = parent:FindFirstChild(name)
-	if not child then child = parent:WaitForChild(name, math.max(0.001, bootstrapDeadline - os.clock())) end
-	assert(child and child.ClassName == class, "NightShift bootstrap: " .. parent:GetFullName() .. "." .. name .. " must be " .. class)
-	return child
+-- v2 solo server. IO jobs run outside the single non-yielding economic queue.
+local Players=game:GetService("Players")
+local RS=game:GetService("ReplicatedStorage")
+local SS=game:GetService("ServerStorage")
+local RunService=game:GetService("RunService")
+local Http=game:GetService("HttpService")
+local namespace=RS:WaitForChild("NightShift",10); assert(namespace,"NightShift missing")
+local shared=namespace:WaitForChild("Shared",10); assert(shared,"Shared missing")
+local config=require(shared.Config); local cc=require(shared.CommerceConfig)
+assert(config.ProtocolVersion==2 and cc.ProtocolVersion==2 and cc.Capacity.SeatsPerStore==1,"v2 required")
+local modules=script.Parent.Modules
+local Protocol=require(modules.Protocol)
+local Profiles=require(modules.ProfileService)
+local Ownership=require(modules.OwnershipService)
+local Commerce=require(modules.CommerceService)
+local Game=require(modules.SoloGameService)
+local World=require(modules.WorldAdapter)
+local U=require(modules.ServerUtil)
+local Bridge=require(modules.RuntimeBridge)
+local function now() return workspace:GetServerTimeNow() end
+local authorityAt=now()
+local session=Http:GenerateGUID(false)
+local function newId(prefix) return prefix..":"..Http:GenerateGUID(false) end
+-- Align old world adapter geometry with the authoritative eight-store build.
+config=U.copy(config)
+for _,k in ipairs({"HubPosition","HubSpawn","HubStoreSelect","HubSize","RoadWidth","StoreSize","StoreIds","Stores"}) do config.World[k]=U.copy(cc.World[k]) end
+local builder=require(SS.NightShift.BuildWorld)
+local truck=SS.NightShift:FindFirstChild("BuildDeliveryTruck")
+local world=World.new(builder.build(workspace),config,cc,{Content=require(modules.OperatorContent),TruckBuilder=truck and require(truck)})
+local storage=Profiles.newMemoryStore()
+if cc.Features.PersistentSave then
+ assert(cc.Profile.DefaultMode=="DataStore","Explicit DataStore mode required")
+ local ds=game:GetService("DataStoreService"); local data=ds:GetDataStore(cc.Profile.DataStoreName)
+ storage={Mode="DataStore",GetBudget=function() return ds:GetRequestBudgetForRequestType(Enum.DataStoreRequestType.UpdateAsync) end,
+  UpdateAsync=function(_,key,transform) return data:UpdateAsync(key,transform) end}
+else assert(cc.Profile.DefaultMode=="Memory","Explicit Memory mode required") end
+local profiles=Profiles.new({Config=cc,Store=storage,SessionId=session,UnixNow=os.time,IsStudio=RunService:IsStudio()})
+local commerce=Commerce.new({Config=cc,Profiles=profiles,Now=function() return authorityAt end,NewId=newId,World=world})
+local ownership=Ownership.new(cc,profiles,function(c,p) return commerce:restoreInventory(c,p) end,world)
+commerce:setOwnership(ownership)
+local service=Game.new({Config=config,CommerceConfig=cc,Profiles=profiles,Commerce=commerce,Ownership=ownership,World=world,Now=function() return authorityAt end,NewId=newId})
+local function remote(parent,name,class)
+ local r=parent:FindFirstChild(name); if r then assert(r.ClassName==class,"Remote collision"); return r end
+ r=Instance.new(class); r.Name=name; r.Parent=parent; return r
 end
-local namespace = bounded(ReplicatedStorage, "NightShift", "Folder")
-local config = require(bounded(bounded(namespace, "Shared", "Folder"), "Config", "ModuleScript"))
-assert(config.ProtocolVersion == 1, "NightShift protocol mismatch")
-bootstrapDeadline = os.clock() + config.Network.BootstrapTimeout
-local builder = require(bounded(bounded(ServerStorage, "NightShift", "Folder"), "BuildWorld", "ModuleScript"))
-assert(type(builder) == "table" and type(builder.build) == "function", "BuildWorld.build(parent) is required")
-local modules = bounded(script.Parent, "Modules", "Folder")
-local Protocol = require(bounded(modules, "Protocol", "ModuleScript"))
-local WorldAdapter = require(bounded(modules, "WorldAdapter", "ModuleScript"))
-local GameService = require(bounded(modules, "GameService", "ModuleScript"))
--- Exactly one world build invocation for this server script/session.
-local world = builder.build(workspace)
-local function remote(parent, name, class)
-	local found
-	for _, child in ipairs(parent:GetChildren()) do
-		if child.Name == name then assert(not found and child.ClassName == class, "NightShift remote name/type collision: " .. name); found = child end
-	end
-	if not found then found = Instance.new(class); found.Name = name; found.Parent = parent end
-	return found
+local remotes=remote(namespace,"Remotes","Folder")
+local channels={}
+for _,prefix in ipairs({"","Commerce"}) do channels[prefix]={Action=remote(remotes,prefix.."Action","RemoteEvent"),Ack=remote(remotes,prefix.."ActionResult","RemoteEvent"),
+ State=remote(remotes,prefix.."State","RemoteEvent"),Snapshot=remote(remotes,prefix=="" and "GetSnapshot" or "GetCommerceSnapshot","RemoteFunction")} end
+local connections,queue,jobs,working={},{},{},{}
+local closing,failed,draining=false,false,false
+local serial=0
+local function enqueue(kind,player,data)
+ serial+=1; table.insert(queue,{Kind=kind,Player=player,Data=data,At=now(),Serial=serial})
 end
-local remotes = remote(namespace, "Remotes", "Folder")
-local Action = remote(remotes, "Action", "RemoteEvent")
-local ActionResult = remote(remotes, "ActionResult", "RemoteEvent")
-local State = remote(remotes, "State", "RemoteEvent")
-local GetSnapshot = remote(remotes, "GetSnapshot", "RemoteFunction")
-local service, connections = nil, {}
-local queue, reception = {}, 0
-local draining = false
-local failed = false
-local function enqueue(kind, player, data, receivedAt)
-	reception += 1
-	table.insert(queue, { kind = kind, player = player, data = data, at = receivedAt or clock(), sequence = reception })
+local function job(id,kind,player,connection)
+ jobs[id]=jobs[id] or {}
+ for _,old in ipairs(jobs[id]) do if old.Kind==kind and kind=="save" then return end end
+ table.insert(jobs[id],{Kind=kind,Player=player,Connection=connection})
+ if working[id] then return end
+ working[id]=true
+ task.defer(function()
+  while #jobs[id]>0 do
+   local j=table.remove(jobs[id],1)
+   if j.Kind=="load" then
+    local result=profiles:load(id)
+    if closing or not j.Player or j.Player.Parent~=Players then profiles:save(id,true)
+    else enqueue("ProfileReady",j.Player,{Result=result,Epoch=profiles:status(id).Epoch,Connection=j.Connection}) end
+   else
+    local saved=profiles:save(id,j.Kind=="release")
+    if not saved.Ok then warn("NightShift profile "..j.Kind.." failed: "..tostring(id).." "..saved.Code) end
+   end
+  end
+  working[id]=nil
+ end)
 end
-local function sendAck(player, connection, request, code, moveCode, retry)
-	local user = service.users[player.UserId]
-	if not user then return end
-	local ack = service:ack(user, request.RequestId, code, moveCode, retry)
-	Protocol.remember(connection, request, ack, config)
-	if player.Parent == Players then ActionResult:FireClient(player, ack) end
+local host={contexts=function()
+ local out={}; for _,c in pairs(ownership.owners) do table.insert(out,U.copy(c)) end; return out
+end,activityPlan=function(uid)
+ local c=ownership:getOwnerContext(uid)
+ return c and {Contest=commerce.contest:view(c),Demand=commerce.demand:view(c)} or false
+end,npcInventory=function(uid)
+ local c=ownership:getOwnerContext(uid); local s=c and commerce.stores[c.StoreId]; local out={}
+ if s and not s.Frozen then for _,i in pairs(s.Items) do if i.State=="Shelf" then
+  table.insert(out,{ItemId=i.ItemId,SlotId=i.SlotId,Sku=i.Sku,ContestHeld=i.ContestHeld==true})
+ end end end
+ return out
+end,enqueue=function(kind,c,payload,callback) enqueue("Internal",false,{Kind=kind,Context=U.copy(c),Payload=U.copy(payload),Callback=callback}) end}
+Bridge.configure(host)
+local function trafficBuilder(name)
+ local m=SS.NightShift:FindFirstChild(name)
+ if m and m:IsA("ModuleScript") then local ok,b=pcall(require,m); if ok then return b end end
+ return nil
 end
-local function advanceBefore(at)
-	-- Deadlines earlier than a received event must run at their own time, never at a later heartbeat time.
-	local due = service:nextDeadline()
-	while due < at do
-		service:tick(due)
-		local nextDue = service:nextDeadline()
-		assert(nextDue > due, "NightShift deadline did not advance")
-		due = nextDue
-	end
+local trafficWorld=require(modules.TrafficWorldAdapter).new(world.world,world,
+ {Vehicle=trafficBuilder("BuildRoadVehicle"),Signals=trafficBuilder("BuildTrafficSignals")},Players)
+local traffic=require(modules.TrafficService).new({Config=cc,World=trafficWorld,Bridge=Bridge,Now=now,NewId=newId})
+Bridge.registerTraffic(traffic,function(t) traffic:tick(t) end,function() return traffic:snapshot() end)
+Bridge.registerPedestrianTraffic(traffic)
+if not traffic.ready then warn("NightShift traffic unavailable: "..tostring(traffic.reason)) end
+local npcWorld=require(modules.NPCWorldAdapter).new(world.world,cc,SS.NightShift:FindFirstChild("BuildCustomerRig"))
+local npc=require(modules.NPCShoppingService).new({Config=cc,Bridge=Bridge,World=npcWorld,Now=now,NewId=newId,Random=Random.new()})
+Bridge.registerNPC(npc,function(t) npc:tick(t) end)
+local function internal(data)
+ local c,p=data.Context,data.Payload; local kind=data.Kind
+ if ownership:validate(c)~="OK" then return U.result("STALE_OWNER") end
+ -- The owner lease must still match; notification rounds use the CURRENT night, not spawn-time context.
+ local user=service.users[c.UserId]; local current=user and service:context(user)
+ if not current then return U.result("STALE_OWNER") end
+ c.RoundId=current.RoundId
+ if kind=="EndNpcVisit" then return commerce:endNpcVisit(c,p.NpcId)
+ elseif kind=="SelectNpcItems" then return commerce:selectNpcItems(c,p.NpcId,p.Kind,p.OpportunityId)
+ elseif kind=="CancelNpcSelection" then return commerce:cancelNpcSelection(c,p.NpcId,p.SelectionId)
+ elseif kind=="CommitNpcSale" then return commerce:commitNpcSale(c,p)
+ elseif kind=="ForceDrop" then return commerce:forceDrop(c,p)
+ elseif kind=="OfferOpportunity" then return commerce.contest:offerOpportunity(c,p.Index)
+ elseif kind=="ObserveOpportunity" then return commerce:observeOpportunity(c,p.OpportunityId,p.ArrivedAt,p.Outcome,p.Reason) end
+ return U.result("BAD_REQUEST")
 end
-local function drain(now)
-	if draining or failed or not service then return end
-	draining = true
-	local ok, issue = xpcall(function()
-		local batch = queue
-		queue = {}
-		table.sort(batch, function(a, b) return a.at < b.at or (a.at == b.at and a.sequence < b.sequence) end)
-		local index = 1
-		while index <= #batch do
-			local at = batch[index].at
-			advanceBefore(at)
-			local last = index
-			while last < #batch and batch[last + 1].at == at do last += 1 end
-			local context, leaving = {}, {}
-			-- All same-time disconnects, character loss and validated explicit leaves precede timers/ordinary actions.
-			for cursor = index, last do
-				local event = batch[cursor]
-				local user = service.users[event.player.UserId]
-				if user then
-					if event.kind == "Disconnect" or event.kind == "CharacterGone" then
-						if user.player == event.player then service:depart(user, event.kind == "Disconnect" and "Disconnect" or "Character", context) end
-					elseif event.kind == "Action" and event.data.request.Action == "LeaveStore"
-						and user.player == event.player and service:membership(user, event.data.request) == "OK" then
-						service:depart(user, "Leave", context)
-						leaving[event.sequence] = true
-					end
-				end
-			end
-			service:selectRecoverySurvivors(context)
-			service:tick(at)
-			service:settleDepartures(context, at)
-			for cursor = index, last do
-				local event = batch[cursor]
-				local user = service.users[event.player.UserId]
-				if event.kind == "Connect" then
-					if event.player.Parent == Players then service:connect(event.player) end
-				elseif event.kind == "CharacterReady" then
-					if user and user.player == event.player and event.player.Character == event.data then service:characterReady(user) end
-				elseif event.kind == "Action" then
-					local request, connection = event.data.request, event.data.connection
-					if user and user.player == event.player and connections[event.player] == connection then
-						local code, moveCode, retry
-						if leaving[event.sequence] then
-							code, moveCode = "OK", service.world:move(event.player, false, "Spawn") and "OK" or "MOVE_FAILED"
-						else code, moveCode, retry = service:action(user, request, at) end
-						sendAck(event.player, connection, request, code, moveCode, retry)
-					end
-				end
-			end
-			index = last + 1
-		end
-		advanceBefore(now)
-		service:tick(now)
-	end, debug.traceback)
-	draining = false
-	if not ok then
-		-- Stop accepting mutation after an unexpected invariant violation; do not continue a partially mutated game.
-		failed = true
-		service.ready = false
-		warn("NightShift server stopped: " .. tostring(issue))
-	end
+local function callback(fn,value)
+ if not fn then return end
+ local co=coroutine.create(fn); local ok,err=coroutine.resume(co,value)
+ if coroutine.status(co)~="dead" then coroutine.close(co); warn("NightShift callback yielded") elseif not ok then warn("NightShift callback failed: "..tostring(err)) end
 end
-GetSnapshot.OnServerInvoke = function(player, raw)
-	local now, connection = clock(), connections[player]
-	local empty = { Ok = false, Code = "NOT_READY", RetryAfter = config.Network.SnapshotCooldown, Snapshot = false }
-	if not connection or not service or not service.ready or failed then return empty end
-	if now - connection.snapshotAt < config.Network.SnapshotCooldown then
-		empty.Code, empty.RetryAfter = "RATE_LIMIT", config.Network.SnapshotCooldown - (now - connection.snapshotAt)
-		return empty
-	end
-	connection.snapshotAt = now
-	local code = Protocol.validSnapshot(raw, config)
-	if code ~= "OK" then empty.Code = code; return empty end
-	local user = service.users[player.UserId]
-	if not user or user.player ~= player then return empty end
-	return { Ok = true, Code = "OK", RetryAfter = 0, Snapshot = service:packet(user, connection, now, true) }
+local function drain(t)
+ if draining or failed then return end
+ draining=true
+ local co=coroutine.create(function()
+  commerce.npcAuthority=host.npcAuthority; commerce.collisionAuthority=host.collisionAuthority
+  world:sample(t)
+  for _,user in pairs(service.users) do if user.player and world:outOfBounds(user.player) then
+   commerce:depart(user.id); local c=service:context(user); world:move(user.player,c and c.StoreId or false,"Spawn")
+  end end
+  local batch=queue; queue={}
+  table.sort(batch,function(a,b) return a.At<b.At or (a.At==b.At and a.Serial<b.Serial) end)
+  for _,e in ipairs(batch) do
+   authorityAt=e.At
+   local player,data=e.Player,e.Data; local user=player and service.users[player.UserId]
+   if e.Kind=="Connect" and player.Parent==Players then service:connect(player); job(player.UserId,"load",player,connections[player])
+   elseif e.Kind=="ProfileReady" then
+    if user and user.player==player and connections[player]==data.Connection then
+     if data.Result.Ok then service:profileReady(player,data.Epoch) else user.errorCode=data.Result.Code end
+    end
+   elseif e.Kind=="Disconnect" then
+    if user and user.player==player then
+     local c=service:disconnect(player)
+     if c then U.call(host.npcAuthority,"removeOwner",c.StoreId,c.OwnerGeneration) end
+     job(player.UserId,"release",player)
+    end
+   elseif e.Kind=="CharacterGone" then
+    if user and user.player==player then commerce:depart(user.id); user.loaded=false; if ownership.owners[user.id] then ownership.owners[user.id].Loaded=false end end
+   elseif e.Kind=="CharacterReady" then
+    if user and user.player==player and player.Character==data then local c=service:context(user); world:move(player,c and c.StoreId or false,"Spawn") end
+   elseif e.Kind=="Internal" then callback(data.Callback,internal(data))
+   elseif e.Kind=="Action" then
+    if user and user.player==player and connections[player]==data.Connection then
+     local answer=data.Channel=="Commerce" and service:commerceAction(user,data.Request) or service:action(user,data.Request)
+     local wire=data.Connection[data.Channel]; local ack=service:ack(user,wire,data.Request,answer)
+     Protocol.remember(wire,data.Request,ack,cc); channels[data.Channel].Ack:FireClient(player,ack)
+    end
+   end
+  end
+  authorityAt=t
+  commerce:tick(t); service:tick(t)
+  if host.trafficTick then host.trafficTick(t) end
+  if host.npcTick then host.npcTick(t) end
+ end)
+ local ok,err=coroutine.resume(co)
+ local yielded=coroutine.status(co)~="dead"; if yielded then coroutine.close(co) end
+ draining=false
+ if not ok or yielded then failed=true; service.ready=false; warn("NightShift queue halted: "..tostring(err or "yield forbidden")) end
 end
-Action.OnServerEvent:Connect(function(player, raw)
-	local now, connection = clock(), connections[player]
-	if not connection or not service then return end
-	local parseableId = type(raw) == "table" and Protocol.integer(raw.RequestId, config.Network.MaxRequestId) and raw.RequestId >= 1
-	if not Protocol.consume(connection, config, now) then
-		-- At most one rejection acknowledgement per second, including malformed floods.
-		if parseableId and now - connection.rateReplyAt >= 1 then
-			connection.rateReplyAt = now
-			local user = service.users[player.UserId]
-			if user then ActionResult:FireClient(player, service:ack(user, raw.RequestId, "RATE_LIMIT", false, 1)) end
-		end
-		return
-	end
-	local request, code = Protocol.validate(raw, config)
-	local user = service.users[player.UserId]
-	if not request then
-		connection.rejected += 1
-		if parseableId and user then ActionResult:FireClient(player, service:ack(user, raw.RequestId, code)) end
-		return
-	end
-	if not user then return end
-	local cached = connection.cache[request.RequestId]
-	if cached then
-		ActionResult:FireClient(player, Protocol.equal(request, cached.request) and cached.ack or service:ack(user, request.RequestId, "REQUEST_ID_REUSED"))
-		return
-	end
-	local pending = connection.pending[request.RequestId]
-	if pending then
-		ActionResult:FireClient(player, service:ack(user, request.RequestId, Protocol.equal(request, pending) and "REQUEST_IN_PROGRESS" or "REQUEST_ID_REUSED"))
-		return
-	end
-	if request.RequestId <= connection.high then ActionResult:FireClient(player, service:ack(user, request.RequestId, "STALE_REQUEST")); return end
-	connection.high = request.RequestId
-	if failed or not service.ready then sendAck(player, connection, request, "NOT_READY", false, config.Loading.RetryDelay); return end
-	connection.pending[request.RequestId] = request
-	enqueue("Action", player, { request = request, connection = connection }, now)
-end)
-service = GameService.new(config, WorldAdapter.new(world, config))
-local characterLost = setmetatable({}, { __mode = "k" })
-local playerHooks = {}
-local function trackPlayer(player)
-	if connections[player] then return end
-	connections[player] = Protocol.newConnection(config, clock())
-	enqueue("Connect", player)
-	local hooks = {}
-	playerHooks[player] = hooks
-	local function lost(character)
-		if characterLost[character] then return end
-		characterLost[character] = true
-		enqueue("CharacterGone", player, character)
-	end
-	local function characterAdded(character)
-		-- Waiting for Roblox character creation is outside the authoritative mutation queue and is bounded.
-		task.spawn(function()
-			local human = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", config.Network.BootstrapTimeout)
-			local root = character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart", config.Network.BootstrapTimeout)
-			if player.Parent ~= Players or player.Character ~= character or not human or not human:IsA("Humanoid") or not root then return end
-			if hooks.death then hooks.death:Disconnect() end
-			hooks.death = human.Died:Connect(function() lost(character) end)
-			if human.Health <= 0 then lost(character) else enqueue("CharacterReady", player, character) end
-		end)
-	end
-	hooks.added = player.CharacterAdded:Connect(characterAdded)
-	hooks.removing = player.CharacterRemoving:Connect(lost)
-	if player.Character then characterAdded(player.Character) end
+for prefix,channel in pairs(channels) do
+ local channelKey=prefix
+ channel.Action.OnServerEvent:Connect(function(player,raw)
+  local conn=connections[player]; local user=service.users[player.UserId]
+  if not conn or not user then return end
+  local wire=conn[channelKey]; local t=now()
+  local parseable=type(raw)=="table" and Protocol.integer(raw.RequestId,cc.Network.MaxRequestId) and raw.RequestId>0
+  local function reject(code)
+   if parseable then channel.Ack:FireClient(player,service:ack(user,wire,raw,U.result(code))) end
+  end
+  if not Protocol.consume(conn[""],cc,t) then if t-conn[""].rateReplyAt>=1 then conn[""].rateReplyAt=t; reject("RATE_LIMIT") end; return end
+  local request,code
+  if channelKey=="Commerce" then request,code=Protocol.validateCommerce(raw,cc) else request,code=Protocol.validate(raw,config) end
+  if not request then reject(code); return end
+  local old=wire.cache[request.RequestId]
+  if old then if Protocol.equal(request,old.request) then channel.Ack:FireClient(player,old.ack) else reject("REQUEST_ID_REUSED") end; return end
+  if wire.pending[request.RequestId] then reject(Protocol.equal(request,wire.pending[request.RequestId]) and "REQUEST_IN_PROGRESS" or "REQUEST_ID_REUSED"); return end
+  if request.RequestId<=wire.high then reject("STALE_REQUEST"); return end
+  wire.high=request.RequestId
+  if failed or closing then reject("NOT_READY"); return end
+  wire.pending[request.RequestId]=request
+  enqueue("Action",player,{Channel=channelKey,Connection=conn,Request=request})
+ end)
+ channel.Snapshot.OnServerInvoke=function(player,raw)
+  local conn=connections[player]; local user=service.users[player.UserId]; local t=now()
+  if not conn or not user or failed then return {Ok=false,Code="NOT_READY",Snapshot=false} end
+  local wire=conn[channelKey]; local code=Protocol.validSnapshot(raw,cc)
+  if code~="OK" then return {Ok=false,Code=code,Snapshot=false} end
+  if t-wire.snapshotAt<cc.Network.SnapshotCooldown then return {Ok=false,Code="RATE_LIMIT",RetryAfter=cc.Network.SnapshotCooldown,Snapshot=false} end
+  wire.snapshotAt=t
+  local snapshot=channelKey=="Commerce" and service:commercePacket(user,wire,t) or service:packet(user,wire,t)
+  if channelKey=="Commerce" and host.trafficSnapshot then snapshot.Traffic=host.trafficSnapshot() end
+  return {Ok=true,Code="OK",RetryAfter=0,Snapshot=snapshot}
+ end
 end
-Players.PlayerAdded:Connect(trackPlayer)
+local hooks={}
+local function track(player)
+ if closing or connections[player] then return end
+ connections[player]={[""]=Protocol.newConnection(cc,now()),Commerce=Protocol.newConnection(cc,now())}
+ enqueue("Connect",player)
+ local list={}; hooks[player]=list
+ local function added(character)
+  task.spawn(function()
+   local human=character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid",10)
+   local root=character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart",10)
+   if not human or not root or player.Character~=character or player.Parent~=Players then return end
+   table.insert(list,human.Died:Connect(function() enqueue("CharacterGone",player) end))
+   enqueue("CharacterReady",player,character)
+  end)
+ end
+ table.insert(list,player.CharacterAdded:Connect(added)); table.insert(list,player.CharacterRemoving:Connect(function() enqueue("CharacterGone",player) end))
+ if player.Character then added(player.Character) end
+end
+Players.PlayerAdded:Connect(track)
 Players.PlayerRemoving:Connect(function(player)
-	enqueue("Disconnect", player)
-	connections[player] = nil
-	local hooks = playerHooks[player]
-	if hooks then for _, hook in pairs(hooks) do hook:Disconnect() end end
-	playerHooks[player] = nil
+ enqueue("Disconnect",player); connections[player]=nil
+ for _,hook in ipairs(hooks[player] or {}) do hook:Disconnect() end; hooks[player]=nil
 end)
-for _, player in ipairs(Players:GetPlayers()) do trackPlayer(player) end
+for _,player in ipairs(Players:GetPlayers()) do track(player) end
 RunService.Heartbeat:Connect(function()
-	local now = clock()
-	drain(now)
-	if failed then return end
-	for player, connection in pairs(connections) do
-		if now - connection.lastSend >= config.Network.StateInterval then
-			local user = service.users[player.UserId]
-			if user and user.player == player then
-				local packet = service:packet(user, connection, now, connection.sequence == 0)
-				if packet then State:FireClient(player, packet) end
-			end
-		end
-	end
+ local t=now(); drain(t)
+ for _,id in ipairs(profiles:due()) do
+  local user=service.users[id]; job(id,user and user.player and "save" or "release",user and user.player)
+ end
+ if failed then return end
+ commerce:flushPresentation()
+ for player,conn in pairs(connections) do local user=service.users[player.UserId]
+  if user and user.player==player then for prefix,channel in pairs(channels) do local wire=conn[prefix]
+   if t-wire.lastSend>=cc.Network.StateInterval then
+    local packet=prefix=="Commerce" and service:commercePacket(user,wire,t) or service:packet(user,wire,t)
+    if prefix=="Commerce" and host.trafficSnapshot then packet.Traffic=host.trafficSnapshot() end
+    channel.State:FireClient(player,packet)
+   end
+  end end
+ end
 end)
--- Server capacity is configured by the integrator in Studio/place settings; never publish or alter it here.
-print("NightShift server ready: four independent stores; target capacity " .. config.Capacity.TargetPlayers .. "; no play-test claim")
+game:BindToClose(function()
+ closing=true; local deadline=os.clock()+cc.Profile.CloseBudgetSeconds
+ npc:shutdown()
+ traffic:shutdown()
+ for player in pairs(connections) do enqueue("Disconnect",player) end
+ drain(now()); profiles:close()
+ while next(working) and os.clock()<deadline do task.wait(math.min(0.05,deadline-os.clock())) end
+end)
+print("NightShift v2 source runtime: 8 solo stores; Studio acceptance not asserted")

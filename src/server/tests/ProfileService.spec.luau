@@ -53,6 +53,18 @@ return function(ProfileService, Config)
 	local function wallet(service,id,value)
 		return service:mutate(id,service:status(id).Epoch,function(p) p.Wallet=value; return p end)
 	end
+	case("Studio negative users isolated to explicit memory mode",function()
+		local function create(mode,studio)
+			local store=ProfileService.newMemoryStore(); store.Mode=mode
+			return ProfileService.new({Config=Config,Store=store,SessionId="studio",UnixNow=function() return 1000 end,IsStudio=studio})
+		end
+		local s=create("Memory",true)
+		expect(s:load(-1).Ok); expect(s:load(-2).Ok); expect(s:load(1).Ok)
+		expect(wallet(s,-1,17).Ok); eq(s:get(-1).Value.Wallet,17); eq(s:get(-2).Value.Wallet,0); eq(s:get(1).Value.Wallet,0)
+		eq(s:load(0).Code,"BAD_REQUEST"); eq(s:load(-1.5).Code,"BAD_REQUEST")
+		eq(create("Memory",false):load(-1).Code,"BAD_REQUEST")
+		eq(create("DataStore",true):load(-1).Code,"BAD_REQUEST")
+	end)
 	case("nil-only creation and copied results",function()
 		local f=fixture(); local p=load(f,123)
 		eq(p.SchemaVersion,1); eq(p.Wallet,0); eq(p.RewardCursor.Epoch,1); eq(p.Session.Epoch,1)
