@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src https://*.trycloudflare.com; object-src 'none'; base-uri 'none'">
+  <title>NightShift · 실시간 개발 지도</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,'Malgun Gothic',sans-serif;background:#171924;color:#edf0fa}
+    *{box-sizing:border-box}body{margin:0;height:100dvh;display:flex;flex-direction:column}
+    header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #34364b;background:#1e2030}
+    strong{font-size:14px}#status{font-size:11px;color:#b8c3d7;flex:1;min-width:120px}
+    button,a{font:inherit;font-size:12px;color:#dcd4ff;background:#29273f;border:1px solid #62547d;border-radius:8px;padding:7px 10px;text-decoration:none;cursor:pointer}
+    button:focus-visible,a:focus-visible{outline:2px solid #c7b1ff;outline-offset:2px}
+    #screen{flex:1;width:100%;border:0;min-height:0;background:#171924}
+    #notice{padding:20px;color:#c1ccdc;font-size:14px;line-height:1.7}#notice[hidden]{display:none}
+    footer{padding:5px 14px max(5px,env(safe-area-inset-bottom));font-size:10px;color:#9ba5ba;border-top:1px solid #34364b}
+    @media(max-width:480px){header{gap:7px;padding:8px}strong{font-size:12px}#status{order:4;width:100%;font-size:10px}button,a{padding:6px 8px}footer{padding-left:8px}}
+  </style>
+</head>
+<body>
+  <header><strong>NightShift · 개발 지도</strong><span id="status" role="status">접속 주소 확인 중…</span><button id="refresh" type="button">새로고침</button><a id="direct" target="_blank" rel="noopener noreferrer" hidden>직접 열기</a></header>
+  <div id="notice">전체 워커 지도를 불러오고 있습니다. 이 주소를 모바일 즐겨찾기에 저장하세요.</div>
+  <iframe id="screen" title="NightShift 전체 워커와 실시간 통신 지도" sandbox="allow-scripts allow-same-origin allow-downloads" referrerpolicy="no-referrer" hidden></iframe>
+  <footer>공개 · 읽기 전용 · 실시간 조회는 개발 PC가 켜져 있을 때 가능</footer>
+  <script src="portal.js"></script>
+</body>
+</html>
