@@ -39,6 +39,12 @@ test('file locks include read/write and Windows case; read/read stays parallel',
  assert.equal(conflicts({reads:['src']},{reads:['src/client']}),false);
  assert.equal(conflicts({writes:['src/server']},{writes:['src/server2']}),false);
 });
+test('explicit task hold prevents dispatch without rewriting definitions or completing work',async t=>{
+ const f=fixture(t),p=f.make();f.config.heldTasks={first:'superseded by source-only handoff'};f.write();await p.tick({status:'running'});
+ assert.equal(f.calls.length,0);assert.equal(p.snapshot.tasks[0].status,'waiting');assert.match(p.snapshot.tasks[0].reason,/보류/);
+ assert.equal(p.runners.get('first').state.completedStages.length,0);
+ delete f.config.heldTasks;f.write();await p.tick({status:'running'});assert.equal(f.chats.length,1);
+});
 test('activates independent tasks, completes then deactivates without another dispatch',async t=>{
  const f=fixture(t,[task('first'),task('second')]),p=f.make();await p.tick({status:'running'});
  assert.equal(f.calls.filter(c=>c[0]==='dispatch').length,2);assert.equal(p.snapshot.workers[0].status,'active');

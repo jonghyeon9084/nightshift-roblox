@@ -1,0 +1,10 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수. 완료기한 2026-11-01 오전09:00 KST. 최신요구 docs/design/release-target.md 우선, 이전 2인 직원/16인 공동매장 기획은 폐기. 공식 Codex 구독만, 유료 API/유료에셋/Roblox게시/실제판매 금지. 지정파일만수정. Studio는 Integrator만. 실제검증과모의검사를구별하고 미완료를성공표시하지않는다. 필요한모듈은작게나누고 완료보고에 변경파일/실행검증/미검증/후속연결을포함한다.
+최신요구 전체의 최소완결 공유API/상수/프로필마이그레이션/행동payload/스냅샷을설계하고 src/shared 실제수정. 8인1인1매장/직원제거, NPC실제판매·부자확률·일관재고·owner보상, 매장닉네임·업그레이드·진열/창고저장·복원·중복방지, PM채택경쟁/발주목표/재방문, 차량신호/인도·횡단보도/충돌ForceDrop서버전용 API를모듈별분담한다. World교통마커와NPC보행경로계약까지명시. UI/서버가독립구현가능하도록함수·이벤트·테스트케이스구체화. 서버/클라이언트게임파일변경금지. 공개게시MaxPlayers8는권한필요시운영체크로남기되서버9번째소유권거절. 의도적불편·유료승리없음.
+검증 산출물을 모두 만든 뒤 [STAGE_READY:RC_SOLO_STORE_CONTRACT] 표식을 보고하고 Moderator는 실제파일/근거를확인한다.
+
+MODERATOR_MARKER_RULE: Moderator의 최종 완료 응답 마지막 줄에는 지정 STAGE_READY 표식을 문장·인용·코드블록 없이 독립된 한 줄로 적는다. 해당 워커 단계의 지정 산출물과 검사를 확인한 경우에만 사용하며 후속 Studio 미검증을 단계 구현 완료와 구별한다.
+최신 필수 요구·기한은 docs/design/release-target.md, 최종 실플레이 검사는 docs/implementation/release-acceptance-matrix.md를 따른다.
+
+ROOT_RELEASE_LINK: docs/implementation/release-task-decisions.md도 읽는다. 독립 기획 검토를 반영해 R-A 변동 수요/발주 목표와 R-B 영업대회 두 기능을 실제 API/이벤트/검사로 확정한다.
+
+루트 인계: docs/implementation/warehouse-source-handoff.md를 먼저 읽는다. 이전 창고 통합은 저장 미완료이며 전체 합격이 아니다. 독립 소스 개발만 이어간다. 사용자 Escape로 중단된 Computer Use를 재개하거나 같은 UI 저장을 다른 도구로 우회하지 않는다. 코드/오프라인 검사는 가능하다. 최종 저장/실제 인수 미완료는 그대로 보고한다. docs/implementation/release-task-decisions.md의 DR01~12 결정과 실제 창고 검증 보고를 따른다.

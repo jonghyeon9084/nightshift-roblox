@@ -73,6 +73,7 @@ class WorkerPool {
  }
  guard(scope,chats,ignoreId){
   if(this.stopping)return 'Worker pool is stopping';
+  if(scope.id&&Object.hasOwn(this.config.heldTasks||{},scope.id))return '작업 보류: '+this.config.heldTasks[scope.id];
   const quota=this.budget.check();if(quota.blocked)return quota.reason;
   const low=this.freeMemory()<this.config.minFreeMemoryMB;
   if(low)return `메모리 여유 대기: 최소 ${this.config.minFreeMemoryMB} MiB`;
@@ -122,6 +123,7 @@ class WorkerPool {
    const inFlight=!!s.checkpoint||t.adoptExisting;if(inFlight)continue;
    let reason=null;
    if(!inFlight){
+    if(Object.hasOwn(this.config.heldTasks||{},t.id))reason='작업 보류: '+this.config.heldTasks[t.id];
     if(mainState?.status==='attention'||mainState?.halt)reason='주 파이프라인 확인 필요: '+mainState.reason;
     if(this.hasFatal())reason='사용 한도/인증 확인 필요';
     if(!reason&&t.dependsOn.some(id=>!this.runners.get(id)?.state.completedStages.length))reason='선행 작업 완료 대기';

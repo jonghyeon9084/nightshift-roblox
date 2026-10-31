@@ -1,0 +1,12 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수. 완료기한 2026-11-01 오전09:00 KST. 최신요구 docs/design/release-target.md 우선, 이전 2인 직원/16인 공동매장 기획은 폐기. 공식 Codex 구독만, 유료 API/유료에셋/Roblox게시/실제판매 금지. 지정파일만수정. Studio는 Integrator만. 실제검증과모의검사를구별하고 미완료를성공표시하지않는다. 필요한모듈은작게나누고 완료보고에 변경파일/실행검증/미검증/후속연결을포함한다.
+실제구현독립검토.1인1매장/직원제거/저장마이그레이션/재고돈보존/NPC판매·부자/교통신호·드롭/업그레이드·경쟁목표/모바일UI/광고fallback전부점검. P0/P1구체재현과최소수정/회귀검사제시. 가짜테스트통과금지. 재현가능한검사는직접실행,게임소스수정금지.
+검증 산출물을 모두 만든 뒤 [STAGE_READY:RC_RELEASE_CODE_REVIEW] 표식을 보고하고 Moderator는 실제파일/근거를확인한다.
+
+MODERATOR_MARKER_RULE: Moderator의 최종 완료 응답 마지막 줄에는 지정 STAGE_READY 표식을 문장·인용·코드블록 없이 독립된 한 줄로 적는다. 해당 워커 단계의 지정 산출물과 검사를 확인한 경우에만 사용하며 후속 Studio 미검증을 단계 구현 완료와 구별한다.
+최신 필수 요구·기한은 docs/design/release-target.md, 최종 실플레이 검사는 docs/implementation/release-acceptance-matrix.md를 따른다.
+
+ROOT_RELEASE_LINK: docs/implementation/release-task-decisions.md의 R-A/R-B 구현 연결 및 광고 R1~R4 수정을 검사한다. 문서만 있는 기능을 구현 완료로 인정하지 않는다.
+
+옥상 R2/R3/R4 루트 수정이 tools/advertising에 있다. docs/implementation/rooftop-ads-fixes.md와 완료된 rooftop-fix-review.md가 있으면 읽고 중복 구현 대신 남은 지적을 해결한다. 현재소스 검사는 python tools/advertising/tests/run-rooftop.py 이며 Studio 렌더는 별도 확인한다.
+
+루트 인계: docs/implementation/warehouse-source-handoff.md를 먼저 읽는다. 이전 창고 통합은 저장 미완료이며 전체 합격이 아니다. 독립 소스 개발만 이어간다. 사용자 Escape로 중단된 Computer Use를 재개하거나 같은 UI 저장을 다른 도구로 우회하지 않는다. 코드/오프라인 검사는 가능하다. 최종 저장/실제 인수 미완료는 그대로 보고한다. docs/implementation/release-task-decisions.md의 DR01~12 결정과 실제 창고 검증 보고를 따른다.
