@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "reservePercent": 10,
+  "stopNewAtRemainingPercent": 20,
+  "stopActiveAtRemainingPercent": 15,
+  "maxSnapshotAgeSeconds": 900,
+  "note": "Account-wide quota; preserve a margin for running turns and delayed usage reports. No purchase, reset-credit consumption or account switching."
+}

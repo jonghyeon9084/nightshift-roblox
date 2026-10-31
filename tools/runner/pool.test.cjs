@@ -21,6 +21,18 @@ test('validates parents, cycles, dependencies and bounded concrete work',()=>{
  assert.throws(()=>validatePool({...c,tasks:[task('a',{writes:['../escape']})]}),/path/);
  assert.throws(()=>validatePool({...c,maxWorkers:5}));
 });
+test('quota gate blocks models and dispatch while preserving observation; hard reserve stops own active chat once',async t=>{
+ const f=fixture(t,[task('first'),task('second',{dependsOn:['first']})]),p=f.make();
+ let quota={enabled:true,blocked:true,stopActive:false,reason:'quota reserve'};
+ p.budget={check:()=>quota};await p.tick({status:'running'});assert.equal(f.calls.length,0);
+ quota={enabled:true,blocked:false,stopActive:false};await p.tick({status:'running'});assert.equal(f.chats.length,1);
+ f.adapter.stopChat=async id=>{f.calls.push(['stop',id]);const c=f.chats.find(c=>c.id===id);c.isActive=false;c.state='stopped';};
+ quota={enabled:true,blocked:true,stopActive:true,reason:'quota reserve',remainingPercent:15,reservePercent:10};
+ await p.tick({status:'running'});await p.tick({status:'running'});
+ assert.equal(f.calls.filter(c=>c[0]==='stop').length,1);assert.equal(f.chats.length,1);
+ assert.equal(p.snapshot.usageBudget.remainingPercent,15);
+ assert.equal(p.runners.get('first').state.completedStages.length,0);
+});
 test('file locks include read/write and Windows case; read/read stays parallel',()=>{
  assert.equal(conflicts({writes:['SRC/server']},{reads:['src/server/x.luau']}),true);
  assert.equal(conflicts({reads:['src']},{writes:['src/client']}),true);

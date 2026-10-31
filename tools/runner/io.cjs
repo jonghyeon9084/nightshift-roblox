@@ -82,6 +82,7 @@ function createAdapter(root, { cli = path.join(process.env.LOCALAPPDATA, 'Progra
     return result;
   }
   return {
+    async stopChat(id) { return command(['group-chat','stop',id]); },
     async ensureWorker(task) {
       const {stdout}=await run(process.execPath,[cli,'list','agents','--json'],{cwd:root,windowsHide:true,timeout:20000});
       const agents=JSON.parse(stdout);if(agents.some(a=>a.name===task.worker))return;

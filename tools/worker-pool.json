@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "maxWorkers": 4,
+  "maxWorkers": 2,
   "minFreeMemoryMB": 512,
   "tasks": [
     {

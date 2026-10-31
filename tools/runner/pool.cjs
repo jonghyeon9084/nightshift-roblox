@@ -4,6 +4,7 @@ const {PipelineRunner,busy,hash}=require('./pipeline.cjs');
 const {createStore,createFiles,atomicJson,within}=require('./io.cjs');
 const {selectModel}=require('../model-routing.cjs');
 const policy=require('../model-policy.json');
+const {UsageBudget}=require('./usage-budget.cjs');
 const knownScopes={
  'NightShift-Server':{writes:['src/server'],reads:['src/shared']},
  'NightShift-UI':{writes:['src/client'],reads:['src/shared']},
@@ -48,9 +49,10 @@ function validatePool(config,root){
 }
 function taskStage(t){const selection=selectModel(policy,t.worker.slice('NightShift-'.length),t);return {id:t.id,name:t.title,chatName:t.chatName,participants:[t.worker],promptFile:t.promptFile,completionMarker:t.completionMarker,requiredFiles:t.requiredFiles,adoptExisting:t.adoptExisting===true,modelAssignments:{[t.worker.slice('NightShift-'.length)]:selection.tier}};}
 class WorkerPool {
- constructor({root,adapter,freeMemory=()=>os.freemem()/1048576,clock=Date.now}){
+ constructor({root,adapter,freeMemory=()=>os.freemem()/1048576,clock=Date.now,budget=null}){
   Object.assign(this,{root,adapter,freeMemory,clock});this.directory=path.join(root,'.setup/worker-pool');fs.mkdirSync(this.directory,{recursive:true});this.runners=new Map();this.reasons=new Map();this.stopping=false;this.config={version:1,maxWorkers:4,minFreeMemoryMB:512,tasks:[]};this.lastStates=new Map();
   try{for(const t of JSON.parse(fs.readFileSync(path.join(this.directory,'state.json'),'utf8')).tasks||[])this.lastStates.set(t.id,t.status+'|'+(t.reason||''));}catch{}
+  this.budget=budget||new UsageBudget(root,{clock});this.budgetStops=new Set();
  }
  event(kind,data){fs.appendFileSync(path.join(this.directory,'events.jsonl'),JSON.stringify({at:new Date(this.clock()).toISOString(),kind,...data})+'\n');}
  refresh(){
@@ -71,6 +73,7 @@ class WorkerPool {
  }
  guard(scope,chats,ignoreId){
   if(this.stopping)return 'Worker pool is stopping';
+  const quota=this.budget.check();if(quota.blocked)return quota.reason;
   const low=this.freeMemory()<this.config.minFreeMemoryMB;
   if(low)return `메모리 여유 대기: 최소 ${this.config.minFreeMemoryMB} MiB`;
   if(scope.worker){const assigned=chats.find(c=>c.id!==ignoreId&&busy(c)&&c.participants?.some(p=>p.name===scope.worker));if(assigned)return `담당 워커 작업 완료 대기: ${assigned.topic}`;}
@@ -93,6 +96,20 @@ class WorkerPool {
  async observe(){
   if(this.stopping)return;
   this.refresh();this.error=null;
+  const quota=this.budget.check();
+  if(quota.stopActive){
+   for(const t of this.config.tasks){
+    const r=this.getRunner(t),s=r.state;
+    if(!s.checkpoint||!s.chatId||this.budgetStops.has(s.chatId))continue;
+    const chat=await this.adapter.status(s.chatId);
+    if(busy(chat)){
+     if(!this.adapter.stopChat)throw Error('Budget reserve requires stopping active workers; stop adapter missing');
+     // A single deliberate stop preserves files/Studio and does not issue another model request.
+     this.budgetStops.add(s.chatId);await this.adapter.stopChat(s.chatId);
+     this.event('budget-worker-stopped',{taskId:t.id,chatId:s.chatId,remainingPercent:quota.remainingPercent,reservePercent:quota.reservePercent});
+    }
+   }
+  }
   for(const t of this.config.tasks){const r=this.getRunner(t);if(!r.state.completedStages.length&&(r.state.checkpoint||t.adoptExisting))await r.tick({allowDispatch:false});}
   this.publish();
  }
@@ -129,7 +146,7 @@ class WorkerPool {
    const entries=this.config.tasks.filter(t=>t.worker===name),task=entries.find(t=>tasks.find(x=>x.id===t.id).status==='active')||entries.find(t=>tasks.find(x=>x.id===t.id).status!=='completed')||entries.at(-1),row=tasks.find(t=>t.id===task.id);
    workers.push({name,parentName:task.parentName,temporary:task.temporary===true,status:row.status==='completed'?'inactive':row.status,taskId:task.id,taskTitle:task.title,chatId:row.chatId,reason:row.status==='completed'?'작업 완료 · 다음 배정까지 비활성':row.reason,observedState:row.observedState,tier:selectModel(policy,name.slice(11),task).tier});
   }
-  this.snapshot={at:new Date(this.clock()).toISOString(),workers,tasks};atomicJson(path.join(this.directory,'state.json'),this.snapshot);return this.snapshot;
+  this.snapshot={at:new Date(this.clock()).toISOString(),usageBudget:this.budget.check(),workers,tasks};atomicJson(path.join(this.directory,'state.json'),this.snapshot);return this.snapshot;
  }
  resume(){this.refresh();for(const t of this.config.tasks)this.getRunner(t).resume();}
  requestStop(){this.stopping=true;for(const r of this.runners.values())r.requestStop();}
