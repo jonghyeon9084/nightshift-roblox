@@ -1120,5 +1120,12 @@
     "rc_release_code_review": "VIP 계약 연결 후 wire_ 체인으로 인계",
     "rc_release_studio_integration": "VIP 계약 연결 후 wire_ 체인으로 인계",
     "rc_release_pm_gate": "VIP 계약 연결 후 wire_ 체인으로 인계"
+  },
+  "sourceHandoffs": {
+    "rc_release_world_polish": {
+      "scope": "source-only",
+      "file": "docs/implementation/world-source-handoff.md",
+      "sha256": "32a75cba36dfcc5cec44660eede0b432b2ef8441fedc6e9e57b4b2e1c245e758"
+    }
   }
 }

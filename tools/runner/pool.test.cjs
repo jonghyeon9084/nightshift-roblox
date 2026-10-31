@@ -39,6 +39,13 @@ test('file locks include read/write and Windows case; read/read stays parallel',
  assert.equal(conflicts({reads:['src']},{reads:['src/client']}),false);
  assert.equal(conflicts({writes:['src/server']},{writes:['src/server2']}),false);
 });
+test('reviewed source handoff unlocks dependent code without marking original task complete',async t=>{
+ const f=fixture(t,[task('first'),task('second',{dependsOn:['first']})]),p=f.make();p.refresh();p.getRunner(f.config.tasks[0]).state.status='attention';
+ fs.writeFileSync(path.join(f.root,'handoff.md'),'Partial source accepted; integration remains incomplete');
+ f.config.sourceHandoffs={first:{scope:'source-only',file:'handoff.md',sha256:require('./pipeline.cjs').hash(fs.readFileSync(path.join(f.root,'handoff.md')))}};f.write();
+ await p.tick({status:'running'});assert.equal(f.chats.length,1);assert.equal(f.chats[0].id,'second');assert.equal(p.runners.get('first').state.completedStages.length,0);assert.equal(p.snapshot.tasks[0].status,'attention');
+ fs.appendFileSync(path.join(f.root,'handoff.md'),'changed');assert.equal(p.dependencyReady('first'),false);
+});
 test('explicit task hold prevents dispatch without rewriting definitions or completing work',async t=>{
  const f=fixture(t),p=f.make();f.config.heldTasks={first:'superseded by source-only handoff'};f.write();await p.tick({status:'running'});
  assert.equal(f.calls.length,0);assert.equal(p.snapshot.tasks[0].status,'waiting');assert.match(p.snapshot.tasks[0].reason,/보류/);

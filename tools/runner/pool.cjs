@@ -94,6 +94,12 @@ class WorkerPool {
   this.runners.set(t.id,runner);return runner;
  }
  hasFatal(){return [...this.runners.values()].some(r=>r.state.halt||((r.state.status==='attention'||r.state.resumeStatus==='attention')&&/limit|authentication|한도|인증/i.test(r.state.reason||'')));}
+ dependencyReady(id){
+  if(this.runners.get(id)?.state.completedStages.length)return true;
+  const handoff=this.config.sourceHandoffs?.[id];
+  if(!handoff||handoff.scope!=='source-only'||typeof handoff.file!=='string'||!/^[a-f0-9]{64}$/.test(handoff.sha256||''))return false;
+  try{return hash(fs.readFileSync(within(this.root,handoff.file)))===handoff.sha256;}catch{return false;}
+ }
  async observe(){
   if(this.stopping)return;
   this.refresh();this.error=null;
@@ -126,7 +132,7 @@ class WorkerPool {
     if(Object.hasOwn(this.config.heldTasks||{},t.id))reason='작업 보류: '+this.config.heldTasks[t.id];
     if(mainState?.status==='attention'||mainState?.halt)reason='주 파이프라인 확인 필요: '+mainState.reason;
     if(this.hasFatal())reason='사용 한도/인증 확인 필요';
-    if(!reason&&t.dependsOn.some(id=>!this.runners.get(id)?.state.completedStages.length))reason='선행 작업 완료 대기';
+    if(!reason&&t.dependsOn.some(id=>!this.dependencyReady(id)))reason='선행 작업 완료 대기';
     if(!reason){chats??=await this.adapter.list();reason=this.guard(t,chats);}
    }
    if(reason){this.reasons.set(t.id,reason);continue;}
