@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="880" viewBox="0 0 1120 880" role="img" aria-labelledby="title desc">
+  <title id="title">NightShift 오케스트레이터와 등록 워커 13개의 전체 역할 지도</title>
+  <desc id="desc">메인 Codex가 목표와 파일 소유권을 정하고 상주 실행기가 단계별 Maestro 그룹을 시작한다. 그룹 Moderator가 기획, 게임 구현, 경제와 물류, 검토와 운영의 워커 13개 중 필요한 참가자에게 작업을 배분하고 결과를 받는다. 등록 수와 동시 실행 수는 다르며 그룹 참가자는 최대 4명이다. 색상은 역할 분류이며 실시간 상태가 아니다.</desc>
+  <defs>
+    <style>
+      text { font-family: 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; }
+      .title { fill: #f4f7ff; font-size: 30px; font-weight: 700; }
+      .muted { fill: #adbed8; font-size: 15px; }
+      .name { fill: #f3f7ff; font-size: 20px; font-weight: 600; }
+      .label { fill: #c7d3e6; font-size: 16px; }
+      .category { font-size: 18px; font-weight: 600; }
+      .wire { fill: none; stroke: #526784; stroke-width: 2; }
+      .node { fill: #18263c; stroke: #3b5272; stroke-width: 1; }
+    </style>
+    <radialGradient id="glow"><stop stop-color="#a7f3ed" stop-opacity=".8"/><stop offset="1" stop-color="#a7f3ed" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1120" height="880" rx="24" fill="#0e1829"/>
+  <text x="40" y="54" class="title">NightShift · 전체 워커 구조</text>
+  <text x="40" y="84" class="muted">2026-10-31 구성 · 등록 워커 13개 · 그룹 참가자 최대 4명 병렬 · Studio 쓰기 담당 1명</text>
+  <rect x="40" y="108" width="1040" height="48" rx="12" fill="#152238"/>
+  <text x="560" y="138" text-anchor="middle" class="label">메인 Codex: 목표·계약·파일 소유권 설계 → 상주 실행기: 단계별 그룹 시작·완료 확인</text>
+  <path d="M560 156V182" class="wire"/>
+  <rect x="340" y="182" width="440" height="88" rx="16" fill="#213c50" stroke="#80ded4" stroke-width="1.5"/>
+  <text x="560" y="216" text-anchor="middle" class="name">Maestro 그룹 Moderator</text>
+  <text x="560" y="245" text-anchor="middle" class="label">필요한 워커에게 지시 · 응답 취합 · 결과 검토</text>
+  <path d="M560 270V300H40V584 M560 300H305V584 M560 300H570V584 M560 300H835V674" class="wire"/>
+  <circle cx="560" cy="286" r="13" fill="url(#glow)"/><circle cx="560" cy="286" r="4" fill="#b4f5eb"/>
+
+  <text x="60" y="340" class="category" fill="#bcadff">기획</text>
+  <text x="325" y="340" class="category" fill="#8ac9ff">게임 구현</text>
+  <text x="590" y="340" class="category" fill="#8ce4cd">경제·물류</text>
+  <text x="855" y="340" class="category" fill="#f4ca8d">검토·운영</text>
+
+  <path d="M40 404H60 M40 494H60 M40 584H60 M305 404H325 M305 494H325 M305 584H325 M570 404H590 M570 494H590 M570 584H590 M835 404H855 M835 494H855 M835 584H855 M835 674H855" class="wire"/>
+  <g>
+    <rect x="60" y="364" width="225" height="78" rx="12" class="node"/>
+    <text x="78" y="395" class="name">Planner</text><text x="78" y="421" class="label">게임 루프·성장·재방문 기획</text>
+    <rect x="60" y="454" width="225" height="78" rx="12" class="node"/>
+    <text x="78" y="485" class="name">DesignReview</text><text x="78" y="511" class="label">독립 기획 검토·개선안</text>
+    <rect x="60" y="544" width="225" height="78" rx="12" class="node"/>
+    <text x="78" y="575" class="name">Story</text><text x="78" y="601" class="label">세계관·이야기·게임 문구</text>
+  </g>
+  <g>
+    <rect x="325" y="364" width="225" height="78" rx="12" class="node"/>
+    <text x="343" y="395" class="name">Server</text><text x="343" y="421" class="label">게임 규칙·서버 권한·연결</text>
+    <rect x="325" y="454" width="225" height="78" rx="12" class="node"/>
+    <text x="343" y="485" class="name">UI</text><text x="343" y="511" class="label">화면·입력·모바일 조작</text>
+    <rect x="325" y="544" width="225" height="78" rx="12" class="node"/>
+    <text x="343" y="575" class="name">World</text><text x="343" y="601" class="label">8매장 거리·공간·연출</text>
+  </g>
+  <g>
+    <rect x="590" y="364" width="225" height="78" rx="12" class="node"/>
+    <text x="608" y="395" class="name">Profiles</text><text x="608" y="421" class="label">개인 데이터 저장·복원</text>
+    <rect x="590" y="454" width="225" height="78" rx="12" class="node"/>
+    <text x="608" y="485" class="name">Economy</text><text x="608" y="511" class="label">공용 재고·주문·경제·성장</text>
+    <rect x="590" y="544" width="225" height="78" rx="12" class="node"/>
+    <text x="608" y="575" class="name">Delivery</text><text x="608" y="601" class="label">트럭·운반·도난·경보</text>
+  </g>
+  <g>
+    <rect x="855" y="364" width="225" height="78" rx="12" class="node"/>
+    <text x="873" y="395" class="name">Review</text><text x="873" y="421" class="label">독립 코드 검토·오류 분석</text>
+    <rect x="855" y="454" width="225" height="78" rx="12" class="node"/>
+    <text x="873" y="485" class="name">Integrator</text><text x="873" y="511" class="label">공유 계약·통합·Studio 검증</text>
+    <rect x="855" y="544" width="225" height="78" rx="12" class="node"/>
+    <text x="873" y="575" class="name">Dashboard</text><text x="873" y="601" class="label">활동 지도·통신 시각화</text>
+    <rect x="855" y="634" width="225" height="78" rx="12" class="node"/>
+    <text x="873" y="665" class="name">Worker</text><text x="873" y="691" class="label">작고 명확한 확인·보조 작업</text>
+  </g>
+  <rect x="60" y="650" width="755" height="62" rx="12" fill="#152e33" stroke="#2d5f61"/>
+  <text x="80" y="677" class="label" fill="#b4f5eb">예: Profiles + Economy + Delivery + World → 독립 파일 4개 영역 병렬 구현</text>
+  <text x="80" y="699" class="muted">담당 파일과 완료 조건을 먼저 나누고, 의존하는 연결·통합 작업은 다음 단계에서 수행</text>
+  <rect x="40" y="746" width="1040" height="102" rx="12" fill="#152238"/>
+  <text x="60" y="774" class="label">연결선 = 지시·결과 보고 경로 · 열 제목 = 역할 분류 · 색상 = 실시간 상태가 아닌 구조 구분</text>
+  <text x="60" y="802" class="muted">지도 중심은 여러 그룹의 Moderator를 모아 표시합니다. NightShift-Main 탭과 각 그룹은 별도 세션입니다.</text>
+  <text x="60" y="830" class="muted">등록된 13개가 모두 동시에 실행되지는 않습니다. 최대 4명은 그룹 참가자 기준이며 Moderator는 별도입니다.</text>
+</svg>
