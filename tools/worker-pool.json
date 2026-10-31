@@ -980,6 +980,130 @@
         "docs/release-readiness.md",
         "docs/publish-checklist.md"
       ]
+    },
+    {
+      "id": "rc_vip_wire_fix",
+      "title": "실제 VIP·도감 이벤트 서버/UI 연결",
+      "worker": "NightShift-Integrator",
+      "parentName": null,
+      "temporary": false,
+      "workload": "integration",
+      "dependsOn": [
+        "rc_traffic_pedestrians",
+        "rc_release_world_polish"
+      ],
+      "writes": [
+        "src/shared",
+        "src/server",
+        "src/client",
+        "docs/implementation/vip-wire-fix.md"
+      ],
+      "reads": [
+        "docs/implementation/solo-store-ui.md",
+        "docs/implementation/solo-store-server.md",
+        "docs/implementation/npc-shopping.md",
+        "docs/implementation/traffic-pedestrians.md"
+      ],
+      "chatName": "NightShift-VipWireFix",
+      "promptFile": "setup-test/rc_vip_wire_fix-prompt.txt",
+      "completionMarker": "[STAGE_READY:RC_VIP_WIRE_FIX]",
+      "requiredFiles": [
+        "docs/implementation/vip-wire-fix.md"
+      ]
+    },
+    {
+      "id": "wire_rc_release_code_review",
+      "title": "출시 전 기능·권한·재고·UI 독립검토 · 소스 인계",
+      "worker": "NightShift-Review",
+      "parentName": null,
+      "temporary": false,
+      "workload": "review",
+      "dependsOn": [
+        "rc_vip_wire_fix"
+      ],
+      "writes": [
+        "docs/implementation/release-code-review.md"
+      ],
+      "reads": [
+        "src",
+        "tools/world",
+        "tools/advertising",
+        "docs/design/release-target.md",
+        "docs/implementation/solo-store-server.md",
+        "docs/implementation/solo-store-ui.md",
+        "docs/implementation/npc-shopping.md",
+        "docs/implementation/traffic-pedestrians.md",
+        "docs/implementation/vip-wire-fix.md"
+      ],
+      "chatName": "NightShift-ReleaseCodeReview-RC-Wire",
+      "promptFile": "setup-test/wire_rc_release_code_review-prompt.txt",
+      "completionMarker": "[STAGE_READY:WIRE_RC_RELEASE_CODE_REVIEW]",
+      "requiredFiles": [
+        "docs/implementation/release-code-review.md"
+      ]
+    },
+    {
+      "id": "wire_rc_release_studio_integration",
+      "title": "배포 직전 실제 플레이·수정·최종 파일 · 소스 인계",
+      "worker": "NightShift-Integrator",
+      "parentName": null,
+      "temporary": false,
+      "workload": "integration",
+      "dependsOn": [
+        "wire_rc_release_code_review"
+      ],
+      "writes": [
+        "src",
+        "tools/world",
+        "tools/advertising",
+        "tools/integration",
+        "@studio",
+        "docs/implementation/release-studio-report.md",
+        ".setup/release-verification.json"
+      ],
+      "reads": [
+        "docs/design/release-target.md",
+        "docs/design/release-scope-review.md",
+        "docs/implementation/release-code-review.md",
+        "docs/implementation/commerce-deferral-review.md",
+        "docs/implementation/vip-wire-fix.md"
+      ],
+      "chatName": "NightShift-ReleaseStudioIntegration-RC-Wire",
+      "promptFile": "setup-test/wire_rc_release_studio_integration-prompt.txt",
+      "completionMarker": "[STAGE_READY:WIRE_RC_RELEASE_STUDIO_INTEGRATION]",
+      "requiredFiles": [
+        "docs/implementation/release-studio-report.md",
+        ".setup/release-verification.json"
+      ]
+    },
+    {
+      "id": "wire_rc_release_pm_gate",
+      "title": "PM 최종 사용자 인계·배포 준비 판정 · 소스 인계",
+      "worker": "NightShift-PM",
+      "parentName": null,
+      "temporary": false,
+      "workload": "planning",
+      "dependsOn": [
+        "wire_rc_release_studio_integration"
+      ],
+      "writes": [
+        "docs/release-readiness.md",
+        "docs/publish-checklist.md"
+      ],
+      "reads": [
+        "docs/design/release-target.md",
+        "docs/design/pm-release-plan.md",
+        "docs/implementation/release-studio-report.md",
+        ".setup/release-verification.json",
+        "docs/implementation/vip-wire-fix.md"
+      ],
+      "chatName": "NightShift-ReleasePmGate-RC-Wire",
+      "promptFile": "setup-test/wire_rc_release_pm_gate-prompt.txt",
+      "completionMarker": "[STAGE_READY:WIRE_RC_RELEASE_PM_GATE]",
+      "requiredFiles": [
+        "docs/release-readiness.md",
+        "docs/publish-checklist.md"
+      ]
     }
   ],
   "heldTasks": {
@@ -992,6 +1116,9 @@
     "release_code_review": "저장 중단 증거 보존; rc_ 소스 개발 체인으로 인계",
     "release_studio_integration": "저장 중단 증거 보존; rc_ 소스 개발 체인으로 인계",
     "release_pm_gate": "저장 중단 증거 보존; rc_ 소스 개발 체인으로 인계",
-    "next_game_plan": "저장 중단 증거 보존; rc_ 소스 개발 체인으로 인계"
+    "next_game_plan": "저장 중단 증거 보존; rc_ 소스 개발 체인으로 인계",
+    "rc_release_code_review": "VIP 계약 연결 후 wire_ 체인으로 인계",
+    "rc_release_studio_integration": "VIP 계약 연결 후 wire_ 체인으로 인계",
+    "rc_release_pm_gate": "VIP 계약 연결 후 wire_ 체인으로 인계"
   }
 }
