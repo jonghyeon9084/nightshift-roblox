@@ -73,6 +73,7 @@ class WorkerPool {
   if(this.stopping)return 'Worker pool is stopping';
   const low=this.freeMemory()<this.config.minFreeMemoryMB;
   if(low)return `메모리 여유 대기: 최소 ${this.config.minFreeMemoryMB} MiB`;
+  if(scope.worker){const assigned=chats.find(c=>c.id!==ignoreId&&busy(c)&&c.participants?.some(p=>p.name===scope.worker));if(assigned)return `담당 워커 작업 완료 대기: ${assigned.topic}`;}
   for(const c of chats.filter(c=>c.id!==ignoreId&&busy(c)))if(conflicts(scope,this.scopes(c)))return `파일 소유권 대기: ${c.topic}`;
   return null;
  }

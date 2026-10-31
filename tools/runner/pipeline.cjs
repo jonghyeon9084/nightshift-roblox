@@ -77,13 +77,22 @@ class PipelineRunner {
     const effectiveStatus = this.state.status === 'stopped' ? this.state.resumeStatus : this.state.status;
     if (effectiveStatus === 'attention') { this.save({ status: this.state.checkpoint ? 'running' : 'ready', resumeStatus: null, reason: null, idleSince: null }); this.event('operator-resume'); }
   }
+  defer(reason, evidenceFile) {
+    const effectiveStatus=this.state.status==='stopped'?this.state.resumeStatus:this.state.status;
+    if(this.state.halt||this.state.manifestHash!==this.manifestHash||effectiveStatus!=='attention'||this.state.reason!=='Chat settled idle without a fresh moderator completion marker'||!['idle','stopped'].includes(this.state.observedState)||!this.state.checkpoint)throw Error('Only a reviewed, settled incomplete stage may be deferred');
+    if(typeof reason!=='string'||reason.trim().length<20||typeof evidenceFile!=='string')throw Error('A concrete reason and evidence file are required');
+    const evidence=this.files.snapshot([evidenceFile])[evidenceFile];
+    if(!evidence?.size)throw Error('Deferral evidence is missing');
+    this.save({status:'deferred',resumeStatus:null,reason,deferredReview:{at:new Date(this.clock()).toISOString(),evidenceFile,evidence}});
+    this.event('operator-deferred-incomplete',{reason,evidenceFile,evidence});
+  }
   async tick({allowDispatch=true}={}) {
-    if (this.stopRequested || this.locked || ['attention', 'awaiting-review'].includes(this.state.status)) return;
+    if (this.stopRequested || this.locked || ['attention', 'awaiting-review', 'deferred'].includes(this.state.status)) return;
     this.locked = true;
     try {
       if (this.state.manifestHash !== this.manifestHash) return this.attention('Manifest changed after checkpoint; manual review required');
       if (this.state.status === 'stopped') this.save({ status: this.state.resumeStatus || (this.state.checkpoint ? 'running' : 'ready'), resumeStatus: null });
-      if (['attention', 'awaiting-review'].includes(this.state.status)) return;
+      if (['attention', 'awaiting-review', 'deferred'].includes(this.state.status)) return;
       // Each completed stage advances here in the same tick, with no timer delay.
       for (let remaining = this.manifest.stages.length * 3 + 1; remaining > 0; remaining--) {
         if (this.stopRequested) return;
@@ -129,7 +138,11 @@ class PipelineRunner {
           if(freshReason){this.save({status:'waiting-resources',reason:freshReason});this.event('waiting-resources',{reason:freshReason});return;}
           if (this.stopRequested) return;
           const preparedAt = this.clock(), dispatchId = this.uuid();
-          const wirePrompt = `${prompt.trimEnd()}\n\n[RUNNER_DISPATCH:${stage.id}:${dispatchId}]\n`;
+          // Maestro adds participant mentions when absent. Include them before hashing
+          // so persisted wire text and the real CLI transcript stay byte-identical.
+          const mentions=stage.participants.map(name=>`@${name}`).join(' ');
+          const outputContract=`필수 완료 산출물 (정확한 경로): ${stage.requiredFiles.join(', ')}. Moderator는 이 산출물과 검증 근거를 확인한 후 최종 답변 마지막 줄에 ${stage.completionMarker}를 문장이나 코드블록 없이 독립된 한 줄로 적는다. 미완료면 표식을 발행하지 않는다.`;
+          const wirePrompt = `${mentions}\n\n${prompt.trimEnd()}\n\n${outputContract}\n\n[RUNNER_DISPATCH:${stage.id}:${dispatchId}]\n`;
           const baseline = this.files.snapshot(stage.requiredFiles);
           const messageFile = this.files.writePrompt(dispatchId, wirePrompt);
           this.save({ status: 'dispatching', reason: null, chatId: chat?.id || null, idleSince: null, checkpoint: { phase: 'prepared', preparedAt, dispatchId, promptHash: hash(prompt), wireHash: hash(wirePrompt), messageFile, baseline } });

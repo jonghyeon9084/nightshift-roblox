@@ -49,6 +49,14 @@ test('main attention blocks new model requests; in-flight work remains observabl
  const f=fixture(t),p=f.make();await p.tick({status:'attention',reason:'usage limit'});assert.equal(f.calls.length,0);
  await p.tick({status:'running'});assert.equal(f.chats.length,1);f.complete('first');await p.tick({status:'attention',reason:'usage limit'});assert.equal(p.snapshot.tasks[0].status,'completed');
 });
+test('reuse of one worker waits for its current task without an attention stop',async t=>{
+ const f=fixture(t,[task('first'),task('second',{worker:'NightShift-first'})]),p=f.make();
+ await p.tick({status:'running'});
+ assert.equal(f.calls.filter(c=>c[0]==='dispatch').length,1);
+ assert.equal(p.snapshot.tasks[1].status,'waiting');assert.match(p.snapshot.tasks[1].reason,/담당 워커/);
+ f.complete('first');await p.tick({status:'running'});
+ assert.equal(f.calls.filter(c=>c[0]==='dispatch').length,2);assert.equal(p.snapshot.tasks[1].status,'active');
+});
 test('an interrupted ambiguous dispatch never resends on restart',async t=>{
  const f=fixture(t),p=f.make();await p.tick({status:'running'});const r=p.runners.get('first');r.state.checkpoint.phase='prepared';r.store.write(r.state);f.chats.length=0;
  const restarted=f.make();await restarted.tick({status:'running'});assert.equal(restarted.snapshot.tasks[0].status,'attention');assert.equal(f.calls.filter(c=>c[0]==='dispatch').length,1);

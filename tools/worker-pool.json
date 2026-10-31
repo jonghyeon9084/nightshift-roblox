@@ -288,6 +288,417 @@
       "requiredFiles": [
         "docs/design/next-iteration.md"
       ]
+    },
+    {
+      "id": "release_pm_plan",
+      "title": "PM: 경쟁·재방문 벤치마킹과 오전9시 범위",
+      "worker": "NightShift-PM",
+      "parentName": null,
+      "temporary": false,
+      "workload": "planning",
+      "dependsOn": [],
+      "writes": [
+        "docs/design/pm-release-plan.md",
+        "docs/design/retention-benchmark.md",
+        "docs/game-brief.md"
+      ],
+      "reads": [
+        "docs/design/release-target.md",
+        "docs/implementation/commerce-contract.md",
+        "docs/design/retention-plan.md"
+      ],
+      "chatName": "NightShift-ReleasePmPlan",
+      "promptFile": "setup-test/release_pm_plan-prompt.txt",
+      "completionMarker": "[STAGE_READY:RELEASE_PM_PLAN]",
+      "requiredFiles": [
+        "docs/design/pm-release-plan.md",
+        "docs/design/retention-benchmark.md",
+        "docs/game-brief.md"
+      ]
+    },
+    {
+      "id": "release_scope_review",
+      "title": "PM 기획 독립 검토·범위 확정",
+      "worker": "NightShift-DesignReview",
+      "parentName": null,
+      "temporary": false,
+      "workload": "review",
+      "dependsOn": [
+        "release_pm_plan"
+      ],
+      "writes": [
+        "docs/design/release-scope-review.md"
+      ],
+      "reads": [
+        "docs/design/release-target.md",
+        "docs/design/pm-release-plan.md",
+        "docs/design/retention-benchmark.md",
+        "docs/game-brief.md"
+      ],
+      "chatName": "NightShift-ReleaseScopeReview",
+      "promptFile": "setup-test/release_scope_review-prompt.txt",
+      "completionMarker": "[STAGE_READY:RELEASE_SCOPE_REVIEW]",
+      "requiredFiles": [
+        "docs/design/release-scope-review.md"
+      ]
+    },
+    {
+      "id": "rooftop_ads_build",
+      "title": "옥상 광고판4개 직접 제작",
+      "worker": "NightShift-RooftopAds",
+      "parentName": "NightShift-World",
+      "temporary": true,
+      "workload": "code",
+      "dependsOn": [],
+      "writes": [
+        "tools/advertising",
+        "docs/implementation/rooftop-ads.md"
+      ],
+      "reads": [
+        "docs/design/release-target.md",
+        "src/shared",
+        "docs/design/store-design-review.md",
+        "docs/implementation/advertising.md"
+      ],
+      "chatName": "NightShift-RooftopAdsBuild",
+      "promptFile": "setup-test/rooftop_ads_build-prompt.txt",
+      "completionMarker": "[STAGE_READY:ROOFTOP_ADS_BUILD]",
+      "requiredFiles": [
+        "tools/advertising/BuildRooftopBillboards.luau",
+        "docs/implementation/rooftop-ads.md"
+      ]
+    },
+    {
+      "id": "rooftop_ads_review",
+      "title": "옥상 광고 모듈 독립 검토",
+      "worker": "NightShift-Review",
+      "parentName": null,
+      "temporary": false,
+      "workload": "review",
+      "dependsOn": [
+        "rooftop_ads_build"
+      ],
+      "writes": [
+        "docs/implementation/rooftop-ads-review.md"
+      ],
+      "reads": [
+        "tools/advertising",
+        "docs/design/release-target.md",
+        "docs/implementation/rooftop-ads.md"
+      ],
+      "chatName": "NightShift-RooftopAdsReview",
+      "promptFile": "setup-test/rooftop_ads_review-prompt.txt",
+      "completionMarker": "[STAGE_READY:ROOFTOP_ADS_REVIEW]",
+      "requiredFiles": [
+        "docs/implementation/rooftop-ads-review.md"
+      ]
+    },
+    {
+      "id": "solo_store_contract",
+      "title": "1인1매장·저장·NPC·교통 공유 계약",
+      "worker": "NightShift-Server",
+      "parentName": null,
+      "temporary": false,
+      "workload": "code",
+      "dependsOn": [
+        "warehouse_integration",
+        "release_scope_review"
+      ],
+      "writes": [
+        "src/shared",
+        "docs/implementation/solo-store-contract.md"
+      ],
+      "reads": [
+        "src/server",
+        "src/client",
+        "tools/world",
+        "docs/design/release-target.md",
+        "docs/design/pm-release-plan.md",
+        "docs/design/release-scope-review.md"
+      ],
+      "chatName": "NightShift-SoloStoreContract",
+      "promptFile": "setup-test/solo_store_contract-prompt.txt",
+      "completionMarker": "[STAGE_READY:SOLO_STORE_CONTRACT]",
+      "requiredFiles": [
+        "docs/implementation/solo-store-contract.md"
+      ],
+      "risks": [
+        "persistence",
+        "currency",
+        "security"
+      ]
+    },
+    {
+      "id": "solo_store_server",
+      "title": "단독 소유·가게 저장·업그레이드 서버",
+      "worker": "NightShift-StoreOwner",
+      "parentName": "NightShift-Server",
+      "temporary": true,
+      "workload": "code",
+      "dependsOn": [
+        "solo_store_contract"
+      ],
+      "writes": [
+        "src/server",
+        "docs/implementation/solo-store-server.md"
+      ],
+      "reads": [
+        "src/shared",
+        "docs/design/release-target.md",
+        "docs/implementation/solo-store-contract.md"
+      ],
+      "chatName": "NightShift-SoloStoreServer",
+      "promptFile": "setup-test/solo_store_server-prompt.txt",
+      "completionMarker": "[STAGE_READY:SOLO_STORE_SERVER]",
+      "requiredFiles": [
+        "docs/implementation/solo-store-server.md"
+      ],
+      "risks": [
+        "persistence",
+        "currency",
+        "concurrency"
+      ]
+    },
+    {
+      "id": "solo_store_ui",
+      "title": "1인1매장 상점·성장·경쟁 UI 완성",
+      "worker": "NightShift-UI",
+      "parentName": null,
+      "temporary": false,
+      "workload": "interface",
+      "dependsOn": [
+        "solo_store_contract"
+      ],
+      "writes": [
+        "src/client",
+        "docs/implementation/solo-store-ui.md"
+      ],
+      "reads": [
+        "src/shared",
+        "docs/design/release-target.md",
+        "docs/implementation/solo-store-contract.md",
+        "docs/design/pm-release-plan.md",
+        "docs/design/release-scope-review.md"
+      ],
+      "chatName": "NightShift-SoloStoreUi",
+      "promptFile": "setup-test/solo_store_ui-prompt.txt",
+      "completionMarker": "[STAGE_READY:SOLO_STORE_UI]",
+      "requiredFiles": [
+        "docs/implementation/solo-store-ui.md"
+      ]
+    },
+    {
+      "id": "release_world_polish",
+      "title": "한국 편의점 에셋·교통·옥상 광고 완성",
+      "worker": "NightShift-World",
+      "parentName": null,
+      "temporary": false,
+      "workload": "code",
+      "dependsOn": [
+        "solo_store_contract",
+        "rooftop_ads_review"
+      ],
+      "writes": [
+        "tools/world",
+        "tools/advertising",
+        "docs/implementation/release-world-polish.md"
+      ],
+      "reads": [
+        "src/shared",
+        "docs/design/release-target.md",
+        "docs/implementation/solo-store-contract.md",
+        "docs/design/korean-store-reference.md",
+        "docs/design/store-design-review.md",
+        "docs/implementation/rooftop-ads-review.md"
+      ],
+      "chatName": "NightShift-ReleaseWorldPolish",
+      "promptFile": "setup-test/release_world_polish-prompt.txt",
+      "completionMarker": "[STAGE_READY:RELEASE_WORLD_POLISH]",
+      "requiredFiles": [
+        "docs/implementation/release-world-polish.md"
+      ]
+    },
+    {
+      "id": "npc_shopping",
+      "title": "NPC 쇼핑·희귀 부자 손님 매출",
+      "worker": "NightShift-CustomerNPC",
+      "parentName": "NightShift-Server",
+      "temporary": true,
+      "workload": "code",
+      "dependsOn": [
+        "solo_store_server"
+      ],
+      "writes": [
+        "src/server",
+        "docs/implementation/npc-shopping.md"
+      ],
+      "reads": [
+        "src/shared",
+        "docs/design/release-target.md",
+        "docs/implementation/solo-store-contract.md",
+        "docs/implementation/solo-store-server.md"
+      ],
+      "chatName": "NightShift-NpcShopping",
+      "promptFile": "setup-test/npc_shopping-prompt.txt",
+      "completionMarker": "[STAGE_READY:NPC_SHOPPING]",
+      "requiredFiles": [
+        "docs/implementation/npc-shopping.md"
+      ],
+      "risks": [
+        "currency",
+        "concurrency"
+      ]
+    },
+    {
+      "id": "traffic_pedestrians",
+      "title": "차량·신호등·보행자·충돌 물품드롭",
+      "worker": "NightShift-Traffic",
+      "parentName": "NightShift-World",
+      "temporary": true,
+      "workload": "code",
+      "dependsOn": [
+        "npc_shopping",
+        "release_world_polish"
+      ],
+      "writes": [
+        "src/server",
+        "docs/implementation/traffic-pedestrians.md"
+      ],
+      "reads": [
+        "src/shared",
+        "tools/world",
+        "docs/design/release-target.md",
+        "docs/implementation/solo-store-contract.md",
+        "docs/implementation/npc-shopping.md",
+        "docs/implementation/release-world-polish.md"
+      ],
+      "chatName": "NightShift-TrafficPedestrians",
+      "promptFile": "setup-test/traffic_pedestrians-prompt.txt",
+      "completionMarker": "[STAGE_READY:TRAFFIC_PEDESTRIANS]",
+      "requiredFiles": [
+        "docs/implementation/traffic-pedestrians.md"
+      ],
+      "risks": [
+        "currency",
+        "concurrency"
+      ]
+    },
+    {
+      "id": "release_code_review",
+      "title": "출시 전 기능·권한·재고·UI 독립검토",
+      "worker": "NightShift-Review",
+      "parentName": null,
+      "temporary": false,
+      "workload": "review",
+      "dependsOn": [
+        "traffic_pedestrians",
+        "solo_store_ui"
+      ],
+      "writes": [
+        "docs/implementation/release-code-review.md"
+      ],
+      "reads": [
+        "src",
+        "tools/world",
+        "tools/advertising",
+        "docs/design/release-target.md",
+        "docs/implementation/solo-store-server.md",
+        "docs/implementation/solo-store-ui.md",
+        "docs/implementation/npc-shopping.md",
+        "docs/implementation/traffic-pedestrians.md"
+      ],
+      "chatName": "NightShift-ReleaseCodeReview",
+      "promptFile": "setup-test/release_code_review-prompt.txt",
+      "completionMarker": "[STAGE_READY:RELEASE_CODE_REVIEW]",
+      "requiredFiles": [
+        "docs/implementation/release-code-review.md"
+      ]
+    },
+    {
+      "id": "release_studio_integration",
+      "title": "배포 직전 실제 플레이·수정·최종 파일",
+      "worker": "NightShift-Integrator",
+      "parentName": null,
+      "temporary": false,
+      "workload": "integration",
+      "dependsOn": [
+        "release_code_review"
+      ],
+      "writes": [
+        "src",
+        "tools/world",
+        "tools/advertising",
+        "tools/integration",
+        "@studio",
+        "docs/implementation/release-studio-report.md",
+        ".setup/release-verification.json"
+      ],
+      "reads": [
+        "docs/design/release-target.md",
+        "docs/design/release-scope-review.md",
+        "docs/implementation/release-code-review.md",
+        "docs/implementation/commerce-deferral-review.md"
+      ],
+      "chatName": "NightShift-ReleaseStudioIntegration",
+      "promptFile": "setup-test/release_studio_integration-prompt.txt",
+      "completionMarker": "[STAGE_READY:RELEASE_STUDIO_INTEGRATION]",
+      "requiredFiles": [
+        "docs/implementation/release-studio-report.md",
+        ".setup/release-verification.json"
+      ]
+    },
+    {
+      "id": "release_pm_gate",
+      "title": "PM 최종 사용자 인계·배포 준비 판정",
+      "worker": "NightShift-PM",
+      "parentName": null,
+      "temporary": false,
+      "workload": "planning",
+      "dependsOn": [
+        "release_studio_integration"
+      ],
+      "writes": [
+        "docs/release-readiness.md",
+        "docs/publish-checklist.md"
+      ],
+      "reads": [
+        "docs/design/release-target.md",
+        "docs/design/pm-release-plan.md",
+        "docs/implementation/release-studio-report.md",
+        ".setup/release-verification.json"
+      ],
+      "chatName": "NightShift-ReleasePmGate",
+      "promptFile": "setup-test/release_pm_gate-prompt.txt",
+      "completionMarker": "[STAGE_READY:RELEASE_PM_GATE]",
+      "requiredFiles": [
+        "docs/release-readiness.md",
+        "docs/publish-checklist.md"
+      ]
+    },
+    {
+      "id": "rooftop_fix_review",
+      "title": "옥상 광고 수정 독립 재검토",
+      "worker": "NightShift-Review",
+      "parentName": null,
+      "temporary": false,
+      "workload": "review",
+      "dependsOn": [
+        "rooftop_ads_review"
+      ],
+      "writes": [
+        "docs/implementation/rooftop-fix-review.md"
+      ],
+      "reads": [
+        "tools/advertising",
+        "docs/implementation/rooftop-ads-review.md",
+        "docs/implementation/rooftop-ads-fixes.md"
+      ],
+      "chatName": "NightShift-RooftopFixReview",
+      "promptFile": "setup-test/rooftop_fix_review-prompt.txt",
+      "completionMarker": "[STAGE_READY:ROOFTOP_FIX_REVIEW]",
+      "requiredFiles": [
+        "docs/implementation/rooftop-fix-review.md"
+      ]
     }
   ]
 }

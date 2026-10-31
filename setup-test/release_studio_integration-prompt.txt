@@ -1,0 +1,10 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수. 완료기한 2026-11-01 오전09:00 KST. 최신요구 docs/design/release-target.md 우선, 이전 2인 직원/16인 공동매장 기획은 폐기. 공식 Codex 구독만, 유료 API/유료에셋/Roblox게시/실제판매 금지. 지정파일만수정. Studio는 Integrator만. 실제검증과모의검사를구별하고 미완료를성공표시하지않는다. 필요한모듈은작게나누고 완료보고에 변경파일/실행검증/미검증/후속연결을포함한다.
+유일Studio쓰기담당. 검토P0/P1고치고최종실제소스/에셋/새모듈로더설치→실제게임플레이→수정→Edit복귀→.setup/NightShift-release-candidate.rbxl 로컬저장·해시. 이전실제2인접속실패원인을로그/MCP로진단해가능하면해결; 가짜클라이언트통과대체금지. 1인1매장배정/닉네임/PC주문·공유희귀재고/트럭도착·운반·창고·진열/NPC선택·계산·매출/부자방문/업그레이드/공포solo완결/경쟁목표·보상/교통신호·횡단·충돌드롭/옥상4광고/모바일UI/이동중바닥 검증. 실패미해결과 실제미검증을분리해서출시판정NO-GO면그대로. 저장은미게시클라우드제한을운영체크에기록하되로컬어댑터회귀는실행. 실제두플레이어중복권한/재고경합/도난경보/퇴장·재입장 검사, 못한건실제미검증. 광고받은소재없음: 기본안내·빈ID·적격성가드·공식광고10+옥상4등모드정확집계,판매게시금지. 가능한한컴퓨팅유즈재시작없이StudioMCP와파일도구사용;GUI필수는목적을설명하고사용뒤연결정리. 09시이전핵심버그우선. 검증보고작성완료와출시합격은별개이며 최종 releaseReady boolean과 blockers 명시.
+검증 산출물을 모두 만든 뒤 [STAGE_READY:RELEASE_STUDIO_INTEGRATION] 표식을 보고하고 Moderator는 실제파일/근거를확인한다.
+
+MODERATOR_MARKER_RULE: Moderator의 최종 완료 응답 마지막 줄에는 지정 STAGE_READY 표식을 문장·인용·코드블록 없이 독립된 한 줄로 적는다. 해당 워커 단계의 지정 산출물과 검사를 확인한 경우에만 사용하며 후속 Studio 미검증을 단계 구현 완료와 구별한다.
+최신 필수 요구·기한은 docs/design/release-target.md, 최종 실플레이 검사는 docs/implementation/release-acceptance-matrix.md를 따른다.
+
+ROOT_RELEASE_LINK: docs/implementation/release-task-decisions.md를 따른다. R-A/R-B 실제 판매 연동과 옥상광고 R1~R4 수정/실설치를 확인한다. 1인1매장 8인 완성본 요구에 맞게 부서별 보고만 취합하지 말고 최종 Place에서 전체 핵심 플레이를 수행한다.
+
+옥상 R2/R3/R4 루트 수정이 tools/advertising에 있다. docs/implementation/rooftop-ads-fixes.md와 완료된 rooftop-fix-review.md가 있으면 읽고 중복 구현 대신 남은 지적을 해결한다. 현재소스 검사는 python tools/advertising/tests/run-rooftop.py 이며 Studio 렌더는 별도 확인한다.

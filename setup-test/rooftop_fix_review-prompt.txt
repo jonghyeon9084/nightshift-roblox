@@ -1,0 +1,5 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수. NightShift-Review를 재사용한다. 읽기 전용 독립 검토이며 쓰기 소유권은 docs/implementation/rooftop-fix-review.md 하나다. Studio·소스·기타 테스트 파일을 변경하지 않는다. 공식 Codex 구독만 사용하고 유료 API·게시·판매를 하지 않는다.
+
+루트가 tools/advertising/BuildRooftopBillboards.luau의 R2/R3/R4를 수정했고 tools/advertising/tests/의 현재소스 오프라인 검사 21개 PASS 묶음을 실행했다. docs/implementation/rooftop-ads-review.md, rooftop-ads-fixes.md를 읽고 실제 수정 소스와 비교한다. python tools/advertising/tests/run-rooftop.py를 실행할 수 있다. 소스/테스트 해시, 수정의 충분성, 새 회귀, 미검증 엔진/렌더 범위와 구체적인 남은 결함을 보고한다. R1 로더는 다른 Integrator의 후속 범위이며 이 검토에서 설치했다고 하지 않는다. 읽기 범위 tools/advertising와 지정 docs만; 활성 Integrator 소유의 src/world/integration은 건드리지 않는다.
+
+완료는 검토 산출물 준비이며 게임 합격이 아니다. 실제 파일과 근거가 준비되면 [STAGE_READY:ROOFTOP_FIX_REVIEW]. Moderator는 실제 결과를 확인하고 최종 응답의 마지막 줄에 표식을 문장·인용·코드블록 없이 독립된 한 줄로 적는다.

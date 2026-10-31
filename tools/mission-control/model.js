@@ -50,6 +50,7 @@
  function developmentStatus(dev,connected=true){
   if(!connected)return {title:'연결 끊김 · 마지막 기록',reason:'새 상태를 확인하지 못했습니다.',working:false};
   if(!dev)return {title:'개발 상태 미확인',reason:'실행기 상태를 기다립니다.',working:false};
+  if(dev.status==='deferred')return {title:'이전 검증 미완료 · 독립 개발 큐 진행',reason:dev.reason||'미완료 검증을 유지하고 독립 작업을 진행합니다.',working:false};
   if(dev.status==='attention')return {title:'개발 정지·확인 필요',reason:/settled idle.*completion marker/i.test(dev.reason||'')?'응답은 끝났지만 완료 표식을 확인하지 못했습니다.':dev.reason||'다음 단계로 진행하지 못했습니다.',working:false};
   if(dev.status==='awaiting-review')return {title:'등록 작업 완료·후속 검토',reason:'등록된 단계가 끝났습니다. 실제 검증 결과와 후속 작업을 확인합니다.',working:false};
   if(!dev.alive||dev.status==='stopped')return {title:'개발 실행기 중지',reason:dev.reason||'실행 중인 상주 개발 작업이 없습니다.',working:false};

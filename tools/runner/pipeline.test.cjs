@@ -6,6 +6,29 @@ const { acquireSingleton } = require('./resident.cjs');
 const clone = value => structuredClone(value);
 const makeStage = (id, extra = {}) => ({ id, name: id, chatName: `NightShift-${id}`, participants: ['NightShift-Test'], promptFile: `${id}.txt`, completionMarker: `[STAGE_READY:${id.toUpperCase()}]`, requiredFiles: [`${id}.md`], ...extra });
 const message = (actor, content, timestamp) => ({ participantName: actor, role: actor === 'user' ? 'user' : 'assistant', content, timestamp });
+test('operator deferral preserves incomplete evidence and does not dispatch on restart',async()=>{
+ const f=fixture();let r=f.make();await r.tick();
+ r.state.observedState='idle';r.attention('Chat settled idle without a fresh moderator completion marker');r.stop();
+ const checkpoint=clone(r.state.checkpoint),completed=clone(r.state.completedStages),calls=f.calls.length;
+ f.output('review.md','Actual two-client boot failed; follow-up required.');
+ r=f.make();r.defer('Actual two-client verification remains unresolved; independent work is authorized.','review.md');
+ assert.equal(r.state.status,'deferred');assert.equal(r.state.completed,false);assert.deepEqual(r.state.checkpoint,checkpoint);assert.deepEqual(r.state.completedStages,completed);
+ await f.make().tick();assert.equal(f.calls.length,calls);
+ r.stop();r=f.make();await r.tick();assert.equal(r.state.status,'deferred');assert.equal(f.calls.length,calls);
+});
+test('operator deferral refuses running stages, fatal stops and missing evidence',async()=>{
+ const f=fixture(),r=f.make();await r.tick();
+ assert.throws(()=>r.defer('A concrete unresolved verification has been reviewed.','review.md'),/Only a reviewed/);
+ r.state.observedState='idle';r.attention('Chat settled idle without a fresh moderator completion marker');
+ assert.throws(()=>r.defer('A concrete unresolved verification has been reviewed.','review.md'),/missing/);
+ f.output('review.md');r.state.halt={kind:'limit-auth'};
+ assert.throws(()=>r.defer('A concrete unresolved verification has been reviewed.','review.md'),/Only a reviewed/);
+});
+test('wire hash includes explicit participants, exact output paths and standalone moderator marker rule',async()=>{
+ const f=fixture();const dispatch=f.adapter.dispatch;
+ f.adapter.dispatch=async(...args)=>{await dispatch(...args);const wire=f.chats.at(-1).messages.at(-1).content;assert.match(wire,/^@NightShift-Test\n\n/);assert.match(wire,/one\.md/);assert.match(wire,/Moderator/);assert.match(wire,/독립된 한 줄/);};
+ await f.make().tick();assert.equal(f.state.checkpoint.phase,'sent');assert.equal(f.calls.filter(c=>c[0]==='dispatch').length,1);
+});
 function fixture(stages = [makeStage('one')], manifestOptions = {}) {
   let time = 100000, persisted = null;
   const events = [], chats = [], outputs = {}, prompts = new Map(), calls = [];

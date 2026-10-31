@@ -4,3 +4,8 @@
 가능한공식2클라이언트지원경로확인, 미지원이면모의다인검사로정직하게표시. Studio미게시API제약/진짜영속저장/음성실통화는여전히구별. Roblox게시/판매/유료에셋/API결제금지.
 실제검증증거를 .setup/warehouse-verification.json과별도스크린샷, docs/implementation/warehouse-integration.md에 기록. 남은문제·실제미확인범위명시. 새버전Edit로저장후 [STAGE_READY:WAREHOUSE_INTEGRATION].
 추가 사용자 확정: 한국 편의점 참고 구조, 매장 LCD에 운영자가 받은 광고 교체설정, 트럭 측면 광고. 실제받은소재는없으므로 자체안내가 기본. docs/design/korean-store-reference.md/advertiser-content.md 및 store-design-review.md가 있으면 독립검토의 유효한사항을반영. World와Server의 광고슬롯/허용이미지설정을 최종연결하고 실제StudioLCD/차량광고면을확인. 기존광고10면을모드전환으로바꾸면새공식AdGui/managed개수를정확히보고. 공식광고와직접광고를같은face중첩하지말고 빈소재fallback·무료/자체제작을확인. 한국편의점의계산대/냉장고/진열/전자레인지/온수/커피/작은취식공간/사무실/창고가통로를막지않게. 앞으로도기획→독립검토→구현→테스트능동개선이사용자요청. 결과보고에 실제플레이에서발견한 다음개선3개를 근거·기대효과(가설)·완료조건과함께 적어 후속기획으로넘긴다.
+
+MODERATOR_MARKER_RULE: Moderator의 최종 완료 응답 마지막 줄에는 지정 STAGE_READY 표식을 문장·인용·코드블록 없이 독립된 한 줄로 적는다. 해당 워커 단계의 지정 산출물과 검사를 확인한 경우에만 사용하며 후속 Studio 미검증을 단계 구현 완료와 구별한다.
+최신 필수 요구·기한은 docs/design/release-target.md, 최종 실플레이 검사는 docs/implementation/release-acceptance-matrix.md를 따른다.
+
+메인 신규진단: docs/implementation/multiplayer-startup-diagnosis.md를 읽는다. 이전 실제 다인 실패는45초하네스종료가클라이언트초기화보다빠른증거가있다. multiplayer-probe.luau를180초최대대기·실제접속시간기록으로수정했으므로단독Studio소유후한번검증한다. 새문제가없으면동일검사반복금지. 2실제클라이언트응답없으면미통과.

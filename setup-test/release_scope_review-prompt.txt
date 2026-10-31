@@ -1,0 +1,6 @@
+프로젝트 C:\Users\HP\Documents\ChatGPT\로블록스 게임 개발. AGENTS.md 준수. 완료기한 2026-11-01 오전09:00 KST. 최신요구 docs/design/release-target.md 우선, 이전 2인 직원/16인 공동매장 기획은 폐기. 공식 Codex 구독만, 유료 API/유료에셋/Roblox게시/실제판매 금지. 지정파일만수정. Studio는 Integrator만. 실제검증과모의검사를구별하고 미완료를성공표시하지않는다. 필요한모듈은작게나누고 완료보고에 변경파일/실행검증/미검증/후속연결을포함한다.
+PM 초안을 독립검토한다. 핵심요구 누락·재방문 재미가설·경쟁공정성·초보이탈·저장안전·09시완료가능성을 평가. 각지적 근거/구체수정/확인테스트/수용·변경·보류 이유를 적고 최소 완결형릴리즈범위를 확정권고. 직접게임수정금지.
+검증 산출물을 모두 만든 뒤 [STAGE_READY:RELEASE_SCOPE_REVIEW] 표식을 보고하고 Moderator는 실제파일/근거를확인한다.
+
+MODERATOR_MARKER_RULE: Moderator의 최종 완료 응답 마지막 줄에는 지정 STAGE_READY 표식을 문장·인용·코드블록 없이 독립된 한 줄로 적는다. 해당 워커 단계의 지정 산출물과 검사를 확인한 경우에만 사용하며 후속 Studio 미검증을 단계 구현 완료와 구별한다.
+최신 필수 요구·기한은 docs/design/release-target.md, 최종 실플레이 검사는 docs/implementation/release-acceptance-matrix.md를 따른다.
