@@ -8,3 +8,5 @@ MODERATOR_MARKER_RULE: Moderator의 최종 완료 응답 마지막 줄에는 지
 루트 인계: docs/implementation/warehouse-source-handoff.md를 먼저 읽는다. 이전 창고 통합은 저장 미완료이며 전체 합격이 아니다. 독립 소스 개발만 이어간다. 사용자 Escape로 중단된 Computer Use를 재개하거나 같은 UI 저장을 다른 도구로 우회하지 않는다. 코드/오프라인 검사는 가능하다. 최종 저장/실제 인수 미완료는 그대로 보고한다. docs/implementation/release-task-decisions.md의 DR01~12 결정과 실제 창고 검증 보고를 따른다.
 
 추가 인계: docs/implementation/ui-wire-followup.md와 vip-wire-fix.md를 읽고 실제 최신소스에서 VIP/도감/UI 연결을 확인한다. 옛 UI 미완료 표식과 새 보완 완료를 구분한다.
+
+최우선 최신 사용자 재개 승인: docs/implementation/release-resume.md를 먼저 읽는다. 최소10%를 보존하면서 남은 검토/Studio 테스트/수정/최종 저장을 재개하라는 새 요청이 이전20% 중단 및 해당 저장 재개 금지보다 우선한다. 09시 기한 미달은 유지하되 지금 완료를 목표로 한다. 신규 기획 확장이나 중복검사는 하지 않는다. 현재 정책은 신규12%/활성11% 중단·최소10% 예비분이다.

@@ -1,8 +1,8 @@
 {
   "enabled": true,
   "reservePercent": 10,
-  "stopNewAtRemainingPercent": 20,
-  "stopActiveAtRemainingPercent": 15,
+  "stopNewAtRemainingPercent": 12,
+  "stopActiveAtRemainingPercent": 11,
   "maxSnapshotAgeSeconds": 900,
-  "note": "Account-wide quota; preserve a margin for running turns and delayed usage reports. No purchase, reset-credit consumption or account switching."
+  "note": "User resumed remaining review, Studio tests and saving at 20% remaining. One worker at a time; reserve 10%, stop new work at 12%, stop active work at 11% for reporting lag. No purchase, reset credits or account switching."
 }

@@ -10,7 +10,7 @@
 ## 구독과 실행
 - ChatGPT로 로그인된 공식 Codex를 사용한다. OpenAI API 키·별도 API 호출·유료 크레딧 구매·다른 유료 제공자 전환을 하지 않는다.
 - 사용 한도에 도달하면 알리고 멈춘다. 반복 재시도나 다른 계정으로 우회하지 않는다.
-- 사용자의 추가 조건: 2026-11-01 09:00 완성과 구독 한도 최소 10% 보존을 동시에 목표로 한다. tools/usage-budget-policy.json에 따라 잔량 20% 이하에서 새 모델 작업을 배정하지 않고, 15% 이하에서는 실행 중 Maestro 그룹을 중단해 10% 예비분을 보호한다. 공식 get_usage_limits 또는 공식 Codex 세션의 rate_limits 메타데이터만 근거로 사용하며 오래된/없는 잔량은 신규 배정을 막는다. API 키·결제·리셋 크레딧·계정 변경으로 우회하지 않는다. 루트/예약 감시도 잔량을 먼저 확인하고 예비분에 근접하면 추가 기획·구현 호출 없이 상태를 저장하고 알린다. 모든 계정 활동과 지연 집계까지 제어할 수 있다고 보장하지 않는다.
+- 사용자의 추가 조건: 2026-11-01 09:00 완성과 구독 한도 최소 10% 보존을 동시에 목표로 한다. 최신 재개 요청 docs/implementation/release-resume.md에 따라 동시 워커1개로 남은 검토·Studio 테스트·수정·저장을 재개한다. tools/usage-budget-policy.json은 신규12%/활성11% 중단·최소10% 보존이다. 이번 요청은 앞서 중단된 해당 테스트/저장의 재개 승인이며 이후 새로운 중단은 존중한다. 공식 get_usage_limits 또는 공식 Codex 세션의 rate_limits 메타데이터만 근거로 사용하며 오래된/없는 잔량은 신규 배정을 막는다. API 키·결제·리셋 크레딧·계정 변경으로 우회하지 않는다. 루트/예약 감시도 잔량을 먼저 확인하고 예비분에 근접하면 추가 기획·구현 호출 없이 상태를 저장하고 알린다. 모든 계정 활동과 지연 집계까지 제어할 수 있다고 보장하지 않는다.
 - Maestro 워커에서 `node`가 PATH에 없으면 `./tools/Invoke-Node.ps1 <스크립트> <인수>`를 쓴다. 설치된 Codex Node 런타임을 찾아 실행하며 별도 설치나 API 요청을 하지 않는다. Maestro CLI 래퍼도 같은 경로 복구를 사용한다.
 - 사용자가 작업 요구도별 모델 전환을 승인했다. tools/model-policy.json과 tools/set-worker-model.cjs로 다음 위임 모델을 선택한다. 실제 실행 모델은 Codex turn_context로 확인하며 구성값과 구분한다. 테스트는 짧고 필요한 문맥만 전달한다.
 - 새 작업은 tools/model-policy.json의 workload(inspection/test-run/code/interface/debug/planning/review/integration)와 위험 요인으로 모델·추론 수준을 고른다. 저장·게임 머니·권한·동시성은 critical, 재현 후 미해결 복합 오류만 hard-debug로 올린다. 실행 중인 모델 변경·한도 우회·무제한 자동 승급/재시도는 하지 않는다. 기존 단계의 simple/standard/complex 배정은 호환 유지한다.
